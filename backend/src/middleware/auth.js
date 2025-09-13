@@ -91,7 +91,7 @@ const authenticateAPIKey = (req, res, next) => {
   const validAPIKeys = (process.env.API_KEYS || '').split(',').filter(Boolean);
 
   if (!validAPIKeys.includes(apiKey)) {
-    logger.warn(`Invalid API key attempted: ${apiKey.substring(0, 8)}...`);
+    logger.warn('Invalid API key attempted.');
     return next(ErrorFactory.unauthorized('Invalid API key'));
   }
 

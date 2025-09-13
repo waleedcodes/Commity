@@ -6,76 +6,8 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const { validateLeaderboardQuery, validateQueryParams } = require('../middleware/validation');
 const { optionalAuth } = require('../middleware/auth');
 
-// Placeholder route handlers (will be replaced with actual controller methods)
-const getLeaderboard = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get leaderboard endpoint',
-    query: req.query,
-    data: {
-      category: req.query.category,
-      period: req.query.period,
-      // This will be implemented in the controller
-    }
-  });
-});
-
-const getLeaderboardByLocation = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get leaderboard by location endpoint',
-    location: req.params.location,
-    query: req.query,
-  });
-});
-
-const getLeaderboardByLanguage = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get leaderboard by language endpoint',
-    language: req.params.language,
-    query: req.query,
-  });
-});
-
-const getTopContributors = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get top contributors endpoint',
-    query: req.query,
-  });
-});
-
-const getTopRepositories = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get top repositories endpoint',
-    query: req.query,
-  });
-});
-
-const getLeaderboardStats = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get leaderboard statistics endpoint',
-    data: {
-      totalUsers: 0,
-      totalContributions: 0,
-      topCountries: [],
-      topLanguages: [],
-      // This will be implemented in the controller
-    }
-  });
-});
-
-const getUserRanking = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get user ranking endpoint',
-    username: req.params.username,
-    query: req.query,
-  });
-});
+// Import controller
+const LeaderboardController = require('../controllers/leaderboardController');
 
 // Routes
 
@@ -87,7 +19,7 @@ const getUserRanking = asyncHandler(async (req, res) => {
 router.get('/',
   validateLeaderboardQuery,
   optionalAuth,
-  getLeaderboard
+  LeaderboardController.getLeaderboard
 );
 
 /**
@@ -96,7 +28,7 @@ router.get('/',
  * @access  Public
  */
 router.get('/stats',
-  getLeaderboardStats
+  LeaderboardController.getLeaderboardStats
 );
 
 /**
@@ -106,7 +38,7 @@ router.get('/stats',
  */
 router.get('/contributors',
   validateLeaderboardQuery,
-  getTopContributors
+  LeaderboardController.getTopContributors
 );
 
 /**
@@ -116,7 +48,7 @@ router.get('/contributors',
  */
 router.get('/repositories',
   validateQueryParams,
-  getTopRepositories
+  LeaderboardController.getTopRepositories
 );
 
 /**
@@ -126,7 +58,7 @@ router.get('/repositories',
  */
 router.get('/location/:location',
   validateLeaderboardQuery,
-  getLeaderboardByLocation
+  LeaderboardController.getLeaderboardByLocation
 );
 
 /**
@@ -136,7 +68,7 @@ router.get('/location/:location',
  */
 router.get('/language/:language',
   validateLeaderboardQuery,
-  getLeaderboardByLanguage
+  LeaderboardController.getLeaderboardByLanguage
 );
 
 /**
@@ -146,7 +78,7 @@ router.get('/language/:language',
  */
 router.get('/user/:username',
   validateLeaderboardQuery,
-  getUserRanking
+  LeaderboardController.getUserRanking
 );
 
 module.exports = router;

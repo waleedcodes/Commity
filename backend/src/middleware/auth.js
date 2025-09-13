@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const { ErrorFactory } = require('./errorHandler');
 const logger = require('../utils/logger');
 

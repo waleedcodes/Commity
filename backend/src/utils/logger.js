@@ -1,5 +1,6 @@
 const winston = require('winston');
 const path = require('path');
+const fs = require('fs');
 
 // Define log levels
 const levels = {
@@ -56,6 +57,9 @@ const transports = [
 if (process.env.NODE_ENV === 'production') {
   // Ensure logs directory exists
   const logsDir = path.join(process.cwd(), 'logs');
+  if (!fs.existsSync(logsDir)) {
+    fs.mkdirSync(logsDir, { recursive: true });
+  }
   
   transports.push(
     // Error log file

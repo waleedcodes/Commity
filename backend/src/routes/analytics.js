@@ -11,163 +11,53 @@ const {
 } = require('../middleware/validation');
 const { optionalAuth } = require('../middleware/auth');
 
-// Placeholder route handlers (will be replaced with actual controller methods)
-const getGlobalAnalytics = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get global analytics endpoint',
-    query: req.query,
-    data: {
-      period: req.query.period,
-      totalUsers: 0,
-      totalContributions: 0,
-      // This will be implemented in the controller
-    }
-  });
-});
-
-const getUserAnalytics = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get user analytics endpoint',
-    username: req.params.username,
-    query: req.query,
-  });
-});
-
-const getContributionTrends = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get contribution trends endpoint',
-    query: req.query,
-  });
-});
-
-const getLanguageTrends = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get language trends endpoint',
-    query: req.query,
-  });
-});
-
-const getLocationAnalytics = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get location analytics endpoint',
-    query: req.query,
-  });
-});
-
-const getActivityPatterns = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get activity patterns endpoint',
-    username: req.params.username,
-    query: req.query,
-  });
-});
-
-const getComparisonAnalytics = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get comparison analytics endpoint',
-    usernames: req.query.usernames,
-    query: req.query,
-  });
-});
-
-const getRepositoryAnalytics = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get repository analytics endpoint',
-    username: req.params.username,
-    query: req.query,
-  });
-});
-
-const getHistoricalData = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get historical data endpoint',
-    username: req.params.username,
-    query: req.query,
-  });
-});
-
-const getAnalyticsSummary = asyncHandler(async (req, res) => {
-  res.json({
-    success: true,
-    message: 'Get analytics summary endpoint',
-    query: req.query,
-  });
-});
+// Import controller
+const AnalyticsController = require('../controllers/analyticsController');
 
 // Routes
 
 /**
- * @route   GET /api/analytics
+ * @route   GET /api/analytics/global
  * @desc    Get global analytics overview
  * @access  Public
  */
-router.get('/',
+router.get('/global',
   validateAnalyticsQuery,
   validateDateRange,
   optionalAuth,
-  getGlobalAnalytics
+  AnalyticsController.getGlobalAnalytics
 );
 
 /**
- * @route   GET /api/analytics/summary
- * @desc    Get analytics summary and key metrics
+ * @route   GET /api/analytics/insights
+ * @desc    Get platform insights and comprehensive analytics
  * @access  Public
  */
-router.get('/summary',
+router.get('/insights',
   validateQueryParams,
-  getAnalyticsSummary
+  AnalyticsController.getPlatformInsights
 );
 
 /**
- * @route   GET /api/analytics/trends/contributions
- * @desc    Get contribution trends over time
+ * @route   GET /api/analytics/trends
+ * @desc    Get analytics trends and patterns
  * @access  Public
  */
-router.get('/trends/contributions',
+router.get('/trends',
   validateAnalyticsQuery,
   validateDateRange,
-  getContributionTrends
+  AnalyticsController.getAnalyticsTrends
 );
 
 /**
- * @route   GET /api/analytics/trends/languages
- * @desc    Get programming language trends
- * @access  Public
- */
-router.get('/trends/languages',
-  validateAnalyticsQuery,
-  validateDateRange,
-  getLanguageTrends
-);
-
-/**
- * @route   GET /api/analytics/location
- * @desc    Get analytics by location/country
- * @access  Public
- */
-router.get('/location',
-  validateAnalyticsQuery,
-  getLocationAnalytics
-);
-
-/**
- * @route   GET /api/analytics/compare
+ * @route   POST /api/analytics/compare
  * @desc    Compare multiple users' analytics
  * @access  Public
  */
-router.get('/compare',
+router.post('/compare',
   validateAnalyticsQuery,
   validateDateRange,
-  getComparisonAnalytics
+  AnalyticsController.compareUsers
 );
 
 /**
@@ -180,41 +70,7 @@ router.get('/user/:username',
   validateAnalyticsQuery,
   validateDateRange,
   optionalAuth,
-  getUserAnalytics
-);
-
-/**
- * @route   GET /api/analytics/user/:username/patterns
- * @desc    Get user's activity patterns (time-based analysis)
- * @access  Public
- */
-router.get('/user/:username/patterns',
-  validateGitHubUsername,
-  validateAnalyticsQuery,
-  getActivityPatterns
-);
-
-/**
- * @route   GET /api/analytics/user/:username/repositories
- * @desc    Get repository-specific analytics for a user
- * @access  Public
- */
-router.get('/user/:username/repositories',
-  validateGitHubUsername,
-  validateQueryParams,
-  getRepositoryAnalytics
-);
-
-/**
- * @route   GET /api/analytics/user/:username/history
- * @desc    Get historical analytics data for a user
- * @access  Public
- */
-router.get('/user/:username/history',
-  validateGitHubUsername,
-  validateAnalyticsQuery,
-  validateDateRange,
-  getHistoricalData
+  AnalyticsController.getUserAnalytics
 );
 
 module.exports = router;

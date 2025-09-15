@@ -1,13 +1,20 @@
+// Load environment variables first
+require('dotenv').config();
+console.log('✅ Environment variables loaded');
+
 const express = require('express');
+console.log('✅ Express loaded');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const rateLimit = require('express-rate-limit');
-const dotenv = require('dotenv');
+console.log('✅ Middleware packages loaded');
 
 // Import configurations
 const connectDB = require('./config/database');
+console.log('✅ Database config loaded');
 const logger = require('./utils/logger');
+console.log('✅ Logger loaded');
 
 // Import routes
 const userRoutes = require('./routes/users');
@@ -15,10 +22,7 @@ const leaderboardRoutes = require('./routes/leaderboard');
 const analyticsRoutes = require('./routes/analytics');
 
 // Import middleware
-const errorHandler = require('./middleware/errorHandler');
-
-// Load environment variables
-dotenv.config();
+const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,7 +52,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Connect to MongoDB
-connectDB();
+connectDB().catch(err => {
+  logger.error('Failed to connect to database:', err);
+  process.exit(1);
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {

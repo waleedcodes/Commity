@@ -2,10 +2,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Button } from '../ui/Button';
-import { Input } from '../ui/Input';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/Avatar';
-import { cn } from '../../lib/utils';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/Avatar';
+import { cn } from "@/lib/utils"
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

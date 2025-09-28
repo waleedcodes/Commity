@@ -5,7 +5,8 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/Avatar';
 import { useUser, useUserActivity, useUserRepositories } from '../../hooks/useUsers';
-import { useUserAnalytics, useUserRanking } from '../../hooks/useLeaderboard';
+import { useUserAnalytics } from '../../hooks/useAnalytics';
+import { useUserRanking } from '../../hooks/useLeaderboard';
 import { formatNumber, formatDate, formatRelativeTime, getLanguageColor } from '../../utils/helpers';
 
 export default function UserProfile({ params }) {

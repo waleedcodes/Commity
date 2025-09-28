@@ -51,7 +51,7 @@ export const useUser = (username) => {
 
     try {
       const response = await userService.getUserProfile(username);
-      setUser(response.data);
+      setUser(response.data.profile || response.data);
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);

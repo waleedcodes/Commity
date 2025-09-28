@@ -21,11 +21,17 @@ const APP_CONSTANTS = {
   
   // Analytics periods
   ANALYTICS_PERIODS: {
-    DAILY: 'daily',
-    WEEKLY: 'weekly',
-    MONTHLY: 'monthly',
-    YEARLY: 'yearly',
+    DAILY: '1d',
+    WEEKLY: '7d', 
+    MONTHLY: '30d',
+    QUARTERLY: '90d',
+    YEARLY: '365d',
     ALL_TIME: 'all_time',
+    // Legacy support
+    LEGACY_DAILY: 'daily',
+    LEGACY_WEEKLY: 'weekly',
+    LEGACY_MONTHLY: 'monthly',
+    LEGACY_YEARLY: 'yearly',
   },
   
   // GitHub event types

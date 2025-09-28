@@ -492,6 +492,7 @@ class AnalyticsController {
             };
             break;
           case 'monthly':
+          case '30d':
             groupBy_id = {
               year: { $year: '$date' },
               month: { $month: '$date' }
@@ -537,7 +538,7 @@ class AnalyticsController {
         // Format results with date strings
         const formattedResults = results.map(item => {
           let dateStr;
-          if (groupBy === 'monthly') {
+          if (groupBy === 'monthly' || groupBy === '30d') {
             dateStr = `${item._id.year}-${String(item._id.month).padStart(2, '0')}`;
           } else if (groupBy === 'weekly') {
             const date = new Date(item._id.year, 0, 1 + (item._id.week - 1) * 7);

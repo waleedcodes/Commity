@@ -17,7 +17,7 @@ const analyticsSchema = new mongoose.Schema({
   // Time period for analytics
   period: {
     type: String,
-    enum: ['daily', 'weekly', 'monthly', 'yearly'],
+    enum: ['1d', '7d', '30d', '90d', '365d', 'all_time', 'daily', 'weekly', 'monthly', 'yearly'], // Support both new and legacy formats
     required: true,
     index: true,
   },
@@ -313,7 +313,7 @@ analyticsSchema.statics.getAnalyticsByPeriod = function(userId, period, startDat
   return this.find(query).sort({ startDate: -1 });
 };
 
-analyticsSchema.statics.getTopPerformers = function(period = 'monthly', metric = 'contributions.total', limit = 10) {
+analyticsSchema.statics.getTopPerformers = function(period = '30d', metric = 'contributions.total', limit = 10) {
   return this.aggregate([
     { $match: { period } },
     { $sort: { [metric]: -1, startDate: -1 } },
@@ -347,7 +347,7 @@ analyticsSchema.statics.calculateTrends = function(userId, metric = 'contributio
   return this.aggregate([
     { $match: { 
       userId: new mongoose.Types.ObjectId(userId),
-      period: 'monthly'
+      period: '30d'
     }},
     { $sort: { startDate: -1 } },
     { $limit: periods },

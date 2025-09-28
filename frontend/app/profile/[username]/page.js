@@ -1,15 +1,16 @@
 'use client';
-import { useState } from 'react';
+import { useState, use } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/Avatar';
 import { useUser, useUserActivity, useUserRepositories } from '../../hooks/useUsers';
-import { useUserAnalytics, useUserRanking } from '../../hooks/useLeaderboard';
+import { useUserAnalytics } from '../../hooks/useAnalytics';
+import { useUserRanking } from '../../hooks/useLeaderboard';
 import { formatNumber, formatDate, formatRelativeTime, getLanguageColor } from '../../utils/helpers';
 
 export default function UserProfile({ params }) {
-  const { username } = params;
+  const { username } = use(params);
   const [activeTab, setActiveTab] = useState('overview');
 
   const { user, loading: userLoading, refreshUser } = useUser(username);

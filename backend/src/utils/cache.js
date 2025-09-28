@@ -22,6 +22,12 @@ const cacheConfigs = {
     checkperiod: 30, // Check every 30 seconds
   },
   
+  // User analytics - cache for 10 minutes
+  [CACHE_KEYS.USER_ANALYTICS]: {
+    stdTTL: 10 * 60, // 10 minutes
+    checkperiod: 120, // Check every 2 minutes
+  },
+  
   // Leaderboard data - cache for 15 minutes
   [CACHE_KEYS.LEADERBOARD]: {
     stdTTL: 15 * 60, // 15 minutes

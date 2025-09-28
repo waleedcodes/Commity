@@ -125,27 +125,47 @@ class Helpers {
     const end = moment(endDate);
     let start;
     
-    switch (period.toLowerCase()) {
-      case 'daily':
-        start = moment(end).subtract(1, 'day');
-        break;
-      case 'weekly':
-        start = moment(end).subtract(1, 'week');
-        break;
-      case 'monthly':
-        start = moment(end).subtract(1, 'month');
-        break;
-      case 'yearly':
-        start = moment(end).subtract(1, 'year');
-        break;
-      case 'all_time':
-        start = moment('2008-01-01'); // GitHub founded in 2008
-        break;
-      default:
-        start = moment(end).subtract(1, 'month');
+    // Handle different period formats
+    const periodLower = (period || '30d').toLowerCase();
+    
+    // Handle numeric periods like '7d', '30d', '90d', '365d'
+    const dayMatch = periodLower.match(/^(\d+)d$/);
+    if (dayMatch) {
+      const days = parseInt(dayMatch[1]);
+      start = moment(end).subtract(days, 'days');
+    } else {
+      switch (periodLower) {
+        case 'daily':
+        case '1d':
+          start = moment(end).subtract(1, 'day');
+          break;
+        case 'weekly':
+        case '7d':
+          start = moment(end).subtract(7, 'days');
+          break;
+        case 'monthly':
+        case '30d':
+          start = moment(end).subtract(30, 'days');
+          break;
+        case 'quarterly':
+        case '90d':
+          start = moment(end).subtract(90, 'days');
+          break;
+        case 'yearly':
+        case '365d':
+          start = moment(end).subtract(365, 'days');
+          break;
+        case 'all_time':
+          start = moment('2008-01-01'); // GitHub founded in 2008
+          break;
+        default:
+          start = moment(end).subtract(30, 'days');
+      }
     }
     
     return {
+      start: start.toDate(),
+      end: end.toDate(),
       startDate: start.toDate(),
       endDate: end.toDate(),
     };

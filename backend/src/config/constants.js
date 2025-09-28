@@ -63,6 +63,7 @@ const APP_CONSTANTS = {
     USER_PROFILE: 'user_profile',
     USER_REPOS: 'user_repos',
     USER_EVENTS: 'user_events',
+    USER_ANALYTICS: 'user_analytics',
     LEADERBOARD: 'leaderboard',
     ANALYTICS: 'analytics',
     RATE_LIMIT: 'rate_limit',

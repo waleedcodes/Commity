@@ -9,7 +9,11 @@ export const formatNumber = (num) => {
 
 // Format dates
 export const formatDate = (dateString, options = {}) => {
+  if (!dateString) return 'Unknown';
+  
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+  
   const defaultOptions = {
     year: 'numeric',
     month: 'short',
@@ -21,7 +25,11 @@ export const formatDate = (dateString, options = {}) => {
 
 // Format relative time (e.g., "2 hours ago")
 export const formatRelativeTime = (dateString) => {
+  if (!dateString) return 'Unknown';
+  
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+  
   const now = new Date();
   const diffInSeconds = Math.floor((now - date) / 1000);
 

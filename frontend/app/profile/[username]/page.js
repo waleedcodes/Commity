@@ -111,7 +111,10 @@ export default function UserProfile({ params }) {
                   <Button onClick={refreshUser}>
                     Refresh Data
                   </Button>
-                  <Button variant="outline">
+                  <Button 
+                    variant="outline"
+                    onClick={() => window.open(`https://github.com/${user.login}`, '_blank')}
+                  >
                     View on GitHub
                   </Button>
                 </div>

@@ -62,7 +62,7 @@ export default function UserProfile({ params }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row items-start md:items-center space-y-4 md:space-y-0 md:space-x-6">
             <Avatar className="h-24 w-24">
-              <AvatarImage src={user.avatar_url} alt={user.login} />
+              <AvatarImage src={user.avatarUrl || user.avatar_url} alt={user.login} />
               <AvatarFallback className="text-2xl">
                 {user.login?.charAt(0).toUpperCase()}
               </AvatarFallback>
@@ -95,14 +95,19 @@ export default function UserProfile({ params }) {
                     {user.blog && (
                       <div className="flex items-center space-x-1">
                         <span>🔗</span>
-                        <a href={user.blog} className="hover:text-blue-600" target="_blank" rel="noopener noreferrer">
+                        <a 
+                          href={user.blog.startsWith('http') ? user.blog : `https://${user.blog}`} 
+                          className="hover:text-blue-600" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
                           {user.blog}
                         </a>
                       </div>
                     )}
                     <div className="flex items-center space-x-1">
                       <span>📅</span>
-                      <span>Joined {formatDate(user.created_at)}</span>
+                      <span>Joined {formatDate(user.githubCreatedAt || user.created_at)}</span>
                     </div>
                   </div>
                 </div>
@@ -113,7 +118,7 @@ export default function UserProfile({ params }) {
                   </Button>
                   <Button 
                     variant="outline"
-                    onClick={() => window.open(`https://github.com/${user.login}`, '_blank')}
+                    onClick={() => window.open(user.htmlUrl || `https://github.com/${user.login}`, '_blank')}
                   >
                     View on GitHub
                   </Button>
@@ -125,7 +130,7 @@ export default function UserProfile({ params }) {
           {/* Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
             <div className="text-center">
-              <div className="text-2xl font-bold">{formatNumber(user.public_repos || 0)}</div>
+              <div className="text-2xl font-bold">{formatNumber(user.publicRepos || user.public_repos || 0)}</div>
               <div className="text-sm text-muted-foreground">Repositories</div>
             </div>
             <div className="text-center">
@@ -443,12 +448,12 @@ export default function UserProfile({ params }) {
                     </div>
                     <div className="flex justify-between">
                       <span>Public Repos</span>
-                      <span className="font-bold">{user.public_repos || 0}</span>
+                      <span className="font-bold">{user.publicRepos || user.public_repos || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Account Age</span>
                       <span className="font-bold">
-                        {Math.floor((Date.now() - new Date(user.created_at)) / (1000 * 60 * 60 * 24))} days
+                        {Math.floor((Date.now() - new Date(user.githubCreatedAt || user.created_at)) / (1000 * 60 * 60 * 24))} days
                       </span>
                     </div>
                   </div>

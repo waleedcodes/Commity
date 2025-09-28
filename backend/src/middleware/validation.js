@@ -88,8 +88,8 @@ const queryParamsSchema = Joi.object({
 // Analytics query schema
 const analyticsQuerySchema = Joi.object({
   period: Joi.string()
-    .valid(...Object.values(ANALYTICS_PERIODS))
-    .default(ANALYTICS_PERIODS.MONTHLY),
+    .valid(...Object.values(ANALYTICS_PERIODS), '1d', '7d', '30d', '90d', '365d')
+    .default('30d'),
   startDate: Joi.date().iso().optional(),
   endDate: Joi.date().iso().min(Joi.ref('startDate')).optional(),
   username: Joi.string().pattern(REGEX.GITHUB_USERNAME).optional(),

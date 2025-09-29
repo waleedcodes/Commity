@@ -23,7 +23,7 @@ class UserService {
 
   // Get user repositories
   async getUserRepositories(username, params = {}) {
-    return apiService.get(`/users/${username}/repos`, params);
+    return apiService.get(`/users/${username}/repositories`, params);
   }
 
   // Get user activity

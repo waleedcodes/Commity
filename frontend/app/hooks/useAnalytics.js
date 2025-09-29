@@ -108,7 +108,38 @@ export const useUserAnalytics = (username) => {
 
     try {
       const response = await analyticsService.getUserAnalytics(username, params);
-      setUserAnalytics(response.data);
+      const data = response.data;
+      
+      // Map the backend response structure to what the frontend expects
+      const mappedAnalytics = {
+        // Basic stats from lifetime statistics
+        totalCommits: data.statistics?.lifetime?.commits || 0,
+        totalPullRequests: data.statistics?.lifetime?.pullRequests || 0,
+        totalIssues: data.statistics?.lifetime?.issues || 0,
+        totalReviews: data.statistics?.lifetime?.reviews || 0,
+        totalStars: data.repositoryAnalysis?.totalStars || 0,
+        totalForks: data.repositoryAnalysis?.totalForks || 0,
+        
+        // Streak information
+        currentStreak: data.statistics?.lifetime?.streak?.current || 0,
+        longestStreak: data.statistics?.lifetime?.streak?.longest || 0,
+        
+        // Language analysis
+        languages: data.languageAnalysis?.distribution || [],
+        primaryLanguage: data.languageAnalysis?.primary?.name || null,
+        
+        // Repository analysis
+        topRepo: data.repositoryAnalysis?.topRepositories?.[0] || null,
+        avgStarsPerRepo: data.repositoryAnalysis?.averageStars || 0,
+        
+        // Activity timeline for charts
+        activityTimeline: data.activityTimeline || [],
+        
+        // Performance metrics
+        performanceMetrics: data.performanceMetrics || {}
+      };
+      
+      setUserAnalytics(mappedAnalytics);
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);

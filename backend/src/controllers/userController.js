@@ -111,21 +111,105 @@ class UserController {
     // Find user in database
     let user = await User.findByUsername(username);
     
+    // Check if user data is stale and needs refreshing
+    const userService = new UserService();
+    const shouldRefresh = !user || !userService.isRecentlyUpdated(user) || 
+                         (user && (!user.topLanguages || user.topLanguages.length === 0) && 
+                          (!user.totalCommits || user.totalCommits === 0));
+    
     if (!user) {
-      // If user not found, try to fetch from GitHub
+      // If user not found, try to fetch from GitHub with complete data
       try {
         const githubService = new GitHubService();
-        const userService = new UserService();
         
-        const githubProfile = await githubService.getUserProfile(username);
-        user = await userService.createOrUpdateUser(githubProfile);
+        // Fetch complete user data including contributions and languages
+        const [githubProfile, contributions, languages] = await Promise.all([
+          githubService.getUserProfile(username),
+          githubService.getUserContributions(username).catch(err => {
+            logger.warn(`Failed to fetch contributions for ${username}: ${err.message}`);
+            return null;
+          }),
+          githubService.getUserLanguages(username).catch(err => {
+            logger.warn(`Failed to fetch languages for ${username}: ${err.message}`);
+            return null;
+          }),
+        ]);
+
+        // Merge all data
+        const completeUserData = {
+          ...githubProfile,
+          ...(contributions && {
+            totalCommits: contributions.totalCommits || 0,
+            totalPullRequests: contributions.totalPullRequests || 0,
+            totalIssues: contributions.totalIssues || 0,
+            totalReviews: contributions.totalReviews || 0,
+            contributionStreak: contributions.contributionStreak || 0,
+            longestStreak: contributions.longestStreak || 0,
+            contributionCalendar: contributions.contributionCalendar || [],
+          }),
+          ...(languages && { 
+            topLanguages: languages.slice(0, 10).map(lang => ({
+              name: lang.name,
+              percentage: lang.percentage,
+              bytes: lang.bytes,
+              color: lang.color || '#f1c40f'
+            }))
+          }),
+        };
+
+        user = await userService.createOrUpdateUser(completeUserData);
         
-        logger.info(`Created new user profile for: ${username}`);
+        logger.info(`Created new user profile with complete data for: ${username}`);
       } catch (error) {
         if (error.statusCode === 404) {
           throw ErrorFactory.notFound(`User '${username}' not found on GitHub`);
         }
         throw error;
+      }
+    } else if (shouldRefresh) {
+      // Refresh existing user data in background if stale or incomplete
+      try {
+        const githubService = new GitHubService();
+        
+        // Fetch latest data
+        const [contributions, languages] = await Promise.all([
+          githubService.getUserContributions(username).catch(err => {
+            logger.warn(`Failed to refresh contributions for ${username}: ${err.message}`);
+            return null;
+          }),
+          githubService.getUserLanguages(username).catch(err => {
+            logger.warn(`Failed to refresh languages for ${username}: ${err.message}`);
+            return null;
+          }),
+        ]);
+
+        // Update user with fresh data
+        if (contributions) {
+          user.totalCommits = contributions.totalCommits || user.totalCommits || 0;
+          user.totalPullRequests = contributions.totalPullRequests || user.totalPullRequests || 0;
+          user.totalIssues = contributions.totalIssues || user.totalIssues || 0;
+          user.totalReviews = contributions.totalReviews || user.totalReviews || 0;
+          user.contributionStreak = contributions.contributionStreak || user.contributionStreak || 0;
+          user.longestStreak = contributions.longestStreak || user.longestStreak || 0;
+          user.contributionCalendar = contributions.contributionCalendar || user.contributionCalendar || [];
+        }
+
+        if (languages && languages.length > 0) {
+          user.topLanguages = languages.slice(0, 10).map(lang => ({
+            name: lang.name,
+            percentage: lang.percentage,
+            bytes: lang.bytes,
+            color: lang.color || '#f1c40f'
+          }));
+        }
+
+        user.lastFetchedAt = new Date();
+        await user.save();
+        
+        logger.info(`Refreshed stale user data for: ${username}`);
+      } catch (error) {
+        logger.warn(`Failed to refresh user data for ${username}: ${error.message}`);
+        // Continue with existing data if refresh fails
       }
     }
 

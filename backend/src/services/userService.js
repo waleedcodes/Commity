@@ -321,11 +321,18 @@ class UserService {
 
   /**
    * Check if user data was recently updated
+   */
+  isRecentlyUpdated(user) {
+    const threshold = 10 * 60 * 1000; // 10 minutes
+    return user.lastFetchedAt && (Date.now() - user.lastFetchedAt.getTime()) < threshold;
+  }
+
+  /**
+   * Check if user data was recently updated (private method for backward compatibility)
    * @private
    */
   _isRecentlyUpdated(user) {
-    const threshold = 10 * 60 * 1000; // 10 minutes
-    return user.lastFetchedAt && (Date.now() - user.lastFetchedAt.getTime()) < threshold;
+    return this.isRecentlyUpdated(user);
   }
 
   /**

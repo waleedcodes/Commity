@@ -38,7 +38,7 @@ class UserService {
 
   // Get user analytics
   async getUserAnalytics(username, params = {}) {
-    return apiService.get(`/users/${username}/analytics`, params);
+    return apiService.get(`/analytics/user/${username}`, params);
   }
 
   // Get user statistics

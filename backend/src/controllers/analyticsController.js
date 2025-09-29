@@ -312,44 +312,91 @@ class AnalyticsController {
             }))
           : null;
 
-        // Language analysis
-        const languageAnalysis = includeLanguages === 'true' && user.topLanguages
-          ? {
-              primary: user.topLanguages[0] || null,
-              distribution: user.topLanguages.slice(0, 10),
-              totalLanguages: user.topLanguages.length,
-              diversity: this._calculateLanguageDiversity(user.topLanguages),
+        // Language analysis - get from user model or fetch fresh
+        let languageAnalysis = null;
+        if (includeLanguages === 'true') {
+          try {
+            let languages = user.topLanguages || [];
+            
+            // If no languages in user model, try to fetch from GitHub
+            if (!languages || languages.length === 0) {
+              const githubService = new GitHubService();
+              try {
+                languages = await githubService.getUserLanguages(user.username);
+              } catch (error) {
+                logger.warn(`Failed to fetch languages for ${user.username}: ${error.message}`);
+                languages = [];
+              }
             }
-          : null;
 
-        // Repository analysis
-        const repositoryAnalysis = includeRepos === 'true' && user.recentRepos
-          ? {
-              totalPublic: user.publicRepos || 0,
-              totalPrivate: user.totalRepos - user.publicRepos || 0,
-              averageStars: Math.round(
-                user.recentRepos.reduce((sum, repo) => sum + (repo.stargazersCount || 0), 0) / 
-                user.recentRepos.length
-              ),
-              averageForks: Math.round(
-                user.recentRepos.reduce((sum, repo) => sum + (repo.forksCount || 0), 0) / 
-                user.recentRepos.length
-              ),
-              topRepositories: user.recentRepos
-                .sort((a, b) => (b.stargazersCount || 0) - (a.stargazersCount || 0))
-                .slice(0, 5)
-                .map(repo => ({
-                  name: repo.name,
-                  description: repo.description,
-                  language: repo.language,
-                  stars: repo.stargazersCount || 0,
-                  forks: repo.forksCount || 0,
-                  updatedAt: repo.updatedAt,
-                  htmlUrl: repo.htmlUrl,
-                })),
-              languageDistribution: this._calculateRepoLanguageDistribution(user.recentRepos),
+            if (languages && languages.length > 0) {
+              languageAnalysis = {
+                primary: languages[0] || null,
+                distribution: languages.slice(0, 10),
+                totalLanguages: languages.length,
+                diversity: this._calculateLanguageDiversity(languages),
+              };
             }
-          : null;
+          } catch (error) {
+            logger.warn(`Error processing language analysis: ${error.message}`);
+            languageAnalysis = null;
+          }
+        }
+
+        // Repository analysis - fetch live data if not available in user model
+        let repositoryAnalysis = null;
+        if (includeRepos === 'true') {
+          try {
+            // Try to get repositories from user model first, otherwise fetch from GitHub
+            let repositories = user.recentRepos || [];
+            
+            if (!repositories || repositories.length === 0) {
+              const githubService = new GitHubService();
+              repositories = await githubService.getUserRepositories(user.username, {
+                type: 'owner',
+                sort: 'updated',
+                per_page: 50
+              });
+            }
+
+            if (repositories && repositories.length > 0) {
+              const totalStars = repositories.reduce((sum, repo) => sum + (repo.stargazersCount || 0), 0);
+              const totalForks = repositories.reduce((sum, repo) => sum + (repo.forksCount || 0), 0);
+              
+              repositoryAnalysis = {
+                totalPublic: user.publicRepos || 0,
+                totalStars,
+                totalForks,
+                averageStars: repositories.length > 0 ? Math.round(totalStars / repositories.length) : 0,
+                averageForks: repositories.length > 0 ? Math.round(totalForks / repositories.length) : 0,
+                topRepositories: repositories
+                  .sort((a, b) => (b.stargazersCount || 0) - (a.stargazersCount || 0))
+                  .slice(0, 5)
+                  .map(repo => ({
+                    name: repo.name,
+                    description: repo.description,
+                    language: repo.language,
+                    stars: repo.stargazersCount || 0,
+                    forks: repo.forksCount || 0,
+                    updatedAt: repo.updatedAt,
+                    htmlUrl: repo.htmlUrl,
+                  })),
+                languageDistribution: this._calculateRepoLanguageDistribution(repositories),
+              };
+            }
+          } catch (error) {
+            logger.warn(`Failed to fetch repository data for analytics: ${error.message}`);
+            repositoryAnalysis = {
+              totalPublic: user.publicRepos || 0,
+              totalStars: 0,
+              totalForks: 0,
+              averageStars: 0,
+              averageForks: 0,
+              topRepositories: [],
+              languageDistribution: [],
+            };
+          }
+        }
 
         // Performance metrics
         const performanceMetrics = {

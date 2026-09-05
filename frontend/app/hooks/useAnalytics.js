@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { analyticsService } from '../services/analyticsService';
 import { LOADING_STATES } from '../utils/constants';
 
@@ -7,23 +7,27 @@ export const useAnalytics = (params = {}) => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchAnalytics = async (newParams = {}) => {
+  const fetchAnalytics = useCallback(async (newParams = {}) => {
     setLoading(LOADING_STATES.LOADING);
     setError(null);
 
     try {
-      const response = await analyticsService.getGlobalAnalytics({ ...params, ...newParams });
+      const mergedParams = { ...params, ...newParams };
+      if (mergedParams.dateRange && !mergedParams.period) {
+        mergedParams.period = mergedParams.dateRange;
+      }
+      const response = await analyticsService.getGlobalAnalytics(mergedParams);
       setAnalytics(response.data);
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [params.period, params.dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [fetchAnalytics]);
 
   return {
     analytics,
@@ -38,7 +42,7 @@ export const usePlatformInsights = () => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchInsights = async (params = {}) => {
+  const fetchInsights = useCallback(async (params = {}) => {
     setLoading(LOADING_STATES.LOADING);
     setError(null);
 
@@ -50,11 +54,11 @@ export const usePlatformInsights = () => {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchInsights();
-  }, []);
+  }, [fetchInsights]);
 
   return {
     insights,
@@ -69,23 +73,27 @@ export const useAnalyticsTrends = (params = {}) => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchTrends = async (newParams = {}) => {
+  const fetchTrends = useCallback(async (newParams = {}) => {
     setLoading(LOADING_STATES.LOADING);
     setError(null);
 
     try {
-      const response = await analyticsService.getAnalyticsTrends({ ...params, ...newParams });
+      const mergedParams = { ...params, ...newParams };
+      if (mergedParams.dateRange && !mergedParams.period) {
+        mergedParams.period = mergedParams.dateRange;
+      }
+      const response = await analyticsService.getAnalyticsTrends(mergedParams);
       setTrends(response.data);
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [params.period, params.dateRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchTrends();
-  }, []);
+  }, [fetchTrends]);
 
   return {
     trends,
@@ -100,7 +108,7 @@ export const useUserAnalytics = (username) => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchUserAnalytics = async (params = {}) => {
+  const fetchUserAnalytics = useCallback(async (params = {}) => {
     if (!username) return;
 
     setLoading(LOADING_STATES.LOADING);
@@ -108,24 +116,24 @@ export const useUserAnalytics = (username) => {
 
     try {
       const response = await analyticsService.getUserAnalytics(username, params);
-      const data = response.data;
+      const data = response.data || {};
       
       // Map the backend response structure to what the frontend expects
       const mappedAnalytics = {
-        // Basic stats from lifetime statistics
-        totalCommits: data.statistics?.lifetime?.commits || 0,
-        totalPullRequests: data.statistics?.lifetime?.pullRequests || 0,
-        totalIssues: data.statistics?.lifetime?.issues || 0,
-        totalReviews: data.statistics?.lifetime?.reviews || 0,
-        totalStars: data.repositoryAnalysis?.totalStars || 0,
-        totalForks: data.repositoryAnalysis?.totalForks || 0,
+        // Basic stats from lifetime statistics or direct fields
+        totalCommits: data.statistics?.lifetime?.commits || data.commits || 0,
+        totalPullRequests: data.statistics?.lifetime?.pullRequests || data.pullRequests || 0,
+        totalIssues: data.statistics?.lifetime?.issues || data.issues || 0,
+        totalReviews: data.statistics?.lifetime?.reviews || data.reviews || 0,
+        totalStars: data.repositoryAnalysis?.totalStars || data.stars || 0,
+        totalForks: data.repositoryAnalysis?.totalForks || data.forks || 0,
         
         // Streak information
-        currentStreak: data.statistics?.lifetime?.streak?.current || 0,
-        longestStreak: data.statistics?.lifetime?.streak?.longest || 0,
+        currentStreak: data.statistics?.lifetime?.streak?.current || data.streak?.current || 0,
+        longestStreak: data.statistics?.lifetime?.streak?.longest || data.streak?.longest || 0,
         
         // Language analysis
-        languages: data.languageAnalysis?.distribution || [],
+        languages: data.languageAnalysis?.distribution || data.languages || [],
         primaryLanguage: data.languageAnalysis?.primary?.name || null,
         
         // Repository analysis
@@ -145,11 +153,11 @@ export const useUserAnalytics = (username) => {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [username]);
 
   useEffect(() => {
     fetchUserAnalytics();
-  }, [username]);
+  }, [fetchUserAnalytics]);
 
   return {
     userAnalytics,
@@ -164,7 +172,7 @@ export const useCompareUsers = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const compareUsers = async (usernames, params = {}) => {
+  const compareUsers = useCallback(async (usernames, params = {}) => {
     if (!usernames || usernames.length === 0) return;
 
     setLoading(true);
@@ -178,12 +186,12 @@ export const useCompareUsers = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const clearComparison = () => {
+  const clearComparison = useCallback(() => {
     setComparison(null);
     setError(null);
-  };
+  }, []);
 
   return {
     comparison,
@@ -199,7 +207,7 @@ export const useLanguageAnalytics = () => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchLanguageAnalytics = async (params = {}) => {
+  const fetchLanguageAnalytics = useCallback(async (params = {}) => {
     setLoading(LOADING_STATES.LOADING);
     setError(null);
 
@@ -211,11 +219,11 @@ export const useLanguageAnalytics = () => {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchLanguageAnalytics();
-  }, []);
+  }, [fetchLanguageAnalytics]);
 
   return {
     languageData,
@@ -230,7 +238,7 @@ export const useGrowthMetrics = (params = {}) => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchGrowthMetrics = async (newParams = {}) => {
+  const fetchGrowthMetrics = useCallback(async (newParams = {}) => {
     setLoading(LOADING_STATES.LOADING);
     setError(null);
 
@@ -242,11 +250,11 @@ export const useGrowthMetrics = (params = {}) => {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [params]);
 
   useEffect(() => {
     fetchGrowthMetrics();
-  }, []);
+  }, [fetchGrowthMetrics]);
 
   return {
     growthData,

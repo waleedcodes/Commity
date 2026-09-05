@@ -17,15 +17,32 @@ const AnalyticsController = require('../controllers/analyticsController');
 // Routes
 
 /**
+ * @route   GET /api/analytics
  * @route   GET /api/analytics/global
  * @desc    Get global analytics overview
  * @access  Public
  */
+router.get('/',
+  validateAnalyticsQuery,
+  validateDateRange,
+  optionalAuth,
+  AnalyticsController.getGlobalAnalytics
+);
+
 router.get('/global',
   validateAnalyticsQuery,
   validateDateRange,
   optionalAuth,
   AnalyticsController.getGlobalAnalytics
+);
+
+/**
+ * @route   GET /api/analytics/summary
+ * @desc    Get analytics summary
+ * @access  Public
+ */
+router.get('/summary',
+  AnalyticsController.getAnalyticsSummary
 );
 
 /**
@@ -50,10 +67,17 @@ router.get('/trends',
 );
 
 /**
+ * @route   GET /api/analytics/compare
  * @route   POST /api/analytics/compare
  * @desc    Compare multiple users' analytics
  * @access  Public
  */
+router.get('/compare',
+  validateAnalyticsQuery,
+  validateDateRange,
+  AnalyticsController.compareUsers
+);
+
 router.post('/compare',
   validateAnalyticsQuery,
   validateDateRange,

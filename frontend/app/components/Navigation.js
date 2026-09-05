@@ -1,145 +1,228 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { 
+  Home, 
+  LayoutDashboard, 
+  Trophy, 
+  BarChart3, 
+  Search, 
+  Moon, 
+  Sun, 
+  Github, 
+  Menu, 
+  X,
+  Sparkles,
+  Users
+} from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/Avatar';
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDark, setIsDark] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check initial dark mode state
+    const isDarkMode = document.documentElement.classList.contains('dark') ||
+      localStorage.getItem('theme') === 'dark' ||
+      (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      setIsDark(true);
+    } else {
+      document.documentElement.classList.remove('dark');
+      setIsDark(false);
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
 
   const navigation = [
-    { name: 'Home', href: '/', icon: '🏠' },
-    { name: 'Dashboard', href: '/dashboard', icon: '📊' },
-    { name: 'Leaderboard', href: '/leaderboard', icon: '🏆' },
-    { name: 'Analytics', href: '/analytics', icon: '📈' },
+    { name: 'Home', href: '/', icon: Home },
+    { name: 'Profiles', href: '/profile', icon: Users },
+    { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   ];
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      window.location.href = `/profile/${searchQuery.trim()}`;
+      router.push(`/profile/${encodeURIComponent(searchQuery.trim())}`);
+      setIsMenuOpen(false);
+      setSearchQuery('');
     }
   };
 
   return (
-    <nav className="bg-white dark:bg-slate-800 shadow-sm border-b border-slate-200 dark:border-slate-700 sticky top-0 z-50">
+    <nav className="backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-50 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-4">
+        <div className="flex justify-between items-center h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xl font-bold">C</span>
+          <Link href="/" className="flex items-center space-x-3 group">
+            <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-105 transition-transform">
+              <Sparkles className="w-5 h-5 text-white" />
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-                Commity
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Analytics</p>
+            <div>
+              <div className="flex items-center space-x-1.5">
+                <span className="text-xl font-bold bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 dark:from-white dark:via-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
+                  Commity
+                </span>
+                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300">
+                  Analytics
+                </span>
+              </div>
             </div>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  'flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                  pathname === item.href
-                    ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
-                )}
-              >
-                <span>{item.icon}</span>
-                <span>{item.name}</span>
-              </Link>
-            ))}
+          <div className="hidden md:flex items-center space-x-1">
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    'flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all',
+                    isActive
+                      ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold shadow-xs'
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800'
+                  )}
+                >
+                  <Icon className={cn('w-4 h-4', isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-400')} />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
           </div>
 
           {/* Search and Actions */}
-          <div className="flex items-center space-x-4">
-            {/* Search */}
+          <div className="flex items-center space-x-3">
+            {/* Quick Search Input */}
             <form onSubmit={handleSearch} className="hidden lg:block">
               <div className="relative">
                 <Input
                   type="text"
-                  placeholder="Search users..."
+                  placeholder="Search user..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-64 pl-10"
+                  className="w-56 pl-9 pr-3 h-9 text-sm rounded-lg bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 focus-visible:ring-1"
                 />
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-slate-400 text-sm">🔍</span>
-                </div>
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               </div>
             </form>
 
-            {/* Theme Toggle */}
-            <Button variant="ghost" size="sm" className="hidden sm:flex">
-              <span className="text-lg">🌙</span>
+            {/* Dark Mode Toggle */}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={toggleDarkMode}
+              className="w-9 h-9 p-0 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              aria-label="Toggle theme"
+            >
+              {isDark ? (
+                <Sun className="w-4 h-4 text-amber-400 animate-in fade-in zoom-in" />
+              ) : (
+                <Moon className="w-4 h-4 text-slate-600 animate-in fade-in zoom-in" />
+              )}
             </Button>
 
-            {/* User Menu */}
-            <div className="relative">
-              <Button variant="ghost" size="sm" className="flex items-center space-x-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src="" alt="" />
-                  <AvatarFallback>U</AvatarFallback>
+            {/* GitHub Repo Link */}
+            <a
+              href="https://github.com/waleedcodes/Commity"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              aria-label="GitHub Repository"
+            >
+              <Github className="w-4 h-4" />
+            </a>
+
+            {/* User Profile Avatar */}
+            <Link href="/profile/waleedcodes">
+              <Button variant="ghost" size="sm" className="h-9 px-2.5 rounded-lg flex items-center space-x-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800">
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="Waleed" />
+                  <AvatarFallback className="text-xs font-semibold">W</AvatarFallback>
                 </Avatar>
-                <span className="hidden sm:block text-sm">User</span>
+                <span className="hidden sm:inline text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  waleedcodes
+                </span>
               </Button>
-            </div>
+            </Link>
 
             {/* Mobile menu button */}
             <Button
               variant="ghost"
               size="sm"
-              className="md:hidden"
+              className="md:hidden w-9 h-9 p-0"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
+              aria-label="Toggle menu"
             >
-              <span className="text-lg">{isMenuOpen ? '✕' : '☰'}</span>
+              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </Button>
           </div>
         </div>
 
-        {/* Mobile Navigation */}
+        {/* Mobile Navigation Drawer */}
         {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-slate-200 dark:border-slate-700">
+          <div className="md:hidden py-4 border-t border-slate-200 dark:border-slate-800 space-y-3 animate-in slide-in-from-top-2">
             {/* Mobile Search */}
-            <form onSubmit={handleSearch} className="mb-4">
-              <Input
-                type="text"
-                placeholder="Search users..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full"
-              />
+            <form onSubmit={handleSearch} className="px-1">
+              <div className="relative">
+                <Input
+                  type="text"
+                  placeholder="Search user (e.g. torvalds)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 text-sm"
+                />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
             </form>
 
             {/* Mobile Menu Items */}
-            <div className="space-y-2">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    'flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-                    pathname === item.href
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700'
-                  )}
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <span>{item.icon}</span>
-                  <span>{item.name}</span>
-                </Link>
-              ))}
+            <div className="space-y-1">
+              {navigation.map((item) => {
+                const Icon = item.icon;
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    )}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}

@@ -61,6 +61,8 @@ const APP_CONSTANTS = {
     REPOSITORIES: 'repositories',
     FOLLOWERS: 'followers',
     CONTRIBUTIONS: 'contributions',
+    PUBLIC_CONTRIBUTIONS: 'public_contributions',
+    PRIVATE_CONTRIBUTIONS: 'private_contributions',
     STREAK: 'streak',
   },
   
@@ -90,7 +92,7 @@ const APP_CONSTANTS = {
   PAGINATION: {
     DEFAULT_PAGE: 1,
     DEFAULT_LIMIT: 20,
-    MAX_LIMIT: 100,
+    MAX_LIMIT: 1000,
   },
   
   // Status codes

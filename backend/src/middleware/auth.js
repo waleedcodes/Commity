@@ -15,7 +15,9 @@ const authenticateToken = (req, res, next) => {
     return next(ErrorFactory.unauthorized('Access token required'));
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  const secret = process.env.JWT_SECRET || 'commity_default_jwt_secret_dev_key';
+
+  jwt.verify(token, secret, (err, user) => {
     if (err) {
       if (err.name === 'TokenExpiredError') {
         return next(ErrorFactory.unauthorized('Token expired'));
@@ -43,7 +45,9 @@ const optionalAuth = (req, res, next) => {
     return next();
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  const secret = process.env.JWT_SECRET || 'commity_default_jwt_secret_dev_key';
+
+  jwt.verify(token, secret, (err, user) => {
     if (!err) {
       req.user = user;
     }

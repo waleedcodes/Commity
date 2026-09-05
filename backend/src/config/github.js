@@ -2,17 +2,23 @@ const { Octokit } = require('@octokit/rest');
 const { graphql } = require('@octokit/graphql');
 const logger = require('../utils/logger');
 
+const isTokenPlaceholder = (token) => {
+  return !token || 
+         token === 'your_github_personal_access_token_here' || 
+         token.includes('your_github_personal_access_token') ||
+         token.trim() === '';
+};
+
 // GitHub API configuration
 const createGitHubClient = () => {
   const auth = process.env.GITHUB_TOKEN;
+  const isPlaceholder = isTokenPlaceholder(auth);
   
-  if (!auth) {
-    logger.error('GITHUB_TOKEN is required but not provided');
-    throw new Error('GitHub token is required. Please set GITHUB_TOKEN environment variable.');
+  if (isPlaceholder) {
+    logger.warn('Valid GITHUB_TOKEN not provided. Using unauthenticated GitHub client.');
   }
 
-  const octokit = new Octokit({
-    auth,
+  const clientOptions = {
     userAgent: 'GitHub-Analytics-Tool/1.0.0',
     timeZone: 'UTC',
     throttle: {
@@ -25,17 +31,24 @@ const createGitHubClient = () => {
         return false;
       },
     },
-  });
+  };
 
-  return octokit;
+  if (!isPlaceholder) {
+    clientOptions.auth = auth;
+  }
+
+  return new Octokit(clientOptions);
 };
 
 // GraphQL client for complex queries
 const createGraphQLClient = () => {
   const auth = process.env.GITHUB_TOKEN;
+  const isPlaceholder = isTokenPlaceholder(auth);
   
-  if (!auth) {
-    throw new Error('GitHub token is required for GraphQL client');
+  if (isPlaceholder) {
+    return async () => {
+      throw new Error('GraphQL requires a valid GITHUB_TOKEN');
+    };
   }
 
   return graphql.defaults({

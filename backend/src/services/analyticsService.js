@@ -26,8 +26,13 @@ class AnalyticsService {
       
       // Create or update analytics record
       const analyticsData = {
+        userId: user._id,
+        githubUsername: user.username,
         username: user.username,
-        date: new Date(date.toDateString()), // Normalize to date only
+        date: new Date(date.toDateString()),
+        startDate: new Date(date.toDateString()),
+        endDate: new Date(date.toDateString()),
+        period: 'daily',
         commits: githubData.commits || 0,
         pullRequests: githubData.pullRequests || 0,
         issues: githubData.issues || 0,
@@ -36,10 +41,20 @@ class AnalyticsService {
         languages: githubData.languages || [],
         additions: githubData.additions || 0,
         deletions: githubData.deletions || 0,
+        contributions: {
+          commits: githubData.commits || 0,
+          pullRequests: githubData.pullRequests || 0,
+          issues: githubData.issues || 0,
+          reviews: githubData.reviews || 0,
+          total: (githubData.commits || 0) + (githubData.pullRequests || 0) + (githubData.issues || 0) + (githubData.reviews || 0),
+        },
       };
 
       const analytics = await Analytics.findOneAndUpdate(
-        { username: user.username, date: analyticsData.date },
+        { 
+          $or: [{ username: user.username }, { githubUsername: user.username }],
+          date: analyticsData.date 
+        },
         analyticsData,
         { upsert: true, new: true }
       );
@@ -65,7 +80,9 @@ class AnalyticsService {
       }
 
       // Get all analytics records for the user
-      const analytics = await Analytics.find({ username: user.username });
+      const analytics = await Analytics.find({
+        $or: [{ username: user.username }, { githubUsername: user.username }]
+      });
       
       // Calculate aggregated statistics
       const totalStats = analytics.reduce((acc, record) => ({
@@ -89,7 +106,7 @@ class AnalyticsService {
           totalIssues: totalStats.issues,
           totalReviews: totalStats.reviews,
           totalContributions: totalStats.commits + totalStats.pullRequests + totalStats.issues + totalStats.reviews,
-          currentStreak: streakInfo.current,
+          contributionStreak: streakInfo.current,
           longestStreak: streakInfo.longest,
           lastAnalyticsUpdate: new Date(),
         },

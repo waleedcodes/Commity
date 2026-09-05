@@ -51,6 +51,11 @@ class UserService {
     return apiService.get(`/users/${username}/contributions`, params);
   }
 
+  // Get authentic multi-year GitHub contribution streak
+  async getUserStreak(username) {
+    return apiService.get(`/users/${username}/streak`);
+  }
+
   // Get user followers
   async getUserFollowers(username, params = {}) {
     return apiService.get(`/users/${username}/followers`, params);

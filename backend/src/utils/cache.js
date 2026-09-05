@@ -47,6 +47,39 @@ const cacheConfigs = {
   },
 };
 
+// Optional Redis client
+let redisClient = null;
+const redisUrl = process.env.REDIS_URL || (process.env.REDIS_HOST ? `redis://${process.env.REDIS_HOST}:${process.env.REDIS_PORT || 6379}` : null);
+
+if (redisUrl) {
+  try {
+    const Redis = require('ioredis');
+    redisClient = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      lazyConnect: true,
+      retryStrategy(times) {
+        if (times > 3) {
+          logger.warn('Redis connection retry limit reached. Falling back to in-memory cache.');
+          return null;
+        }
+        return Math.min(times * 500, 2000);
+      }
+    });
+
+    redisClient.connect().then(() => {
+      logger.info('🚀 Redis connected successfully');
+    }).catch(err => {
+      logger.warn(`Redis connection warning: ${err.message}. Using in-memory cache.`);
+    });
+
+    redisClient.on('error', (err) => {
+      logger.warn(`Redis error: ${err.message}`);
+    });
+  } catch (err) {
+    logger.warn(`Could not initialize Redis client (${err.message}). Using in-memory cache.`);
+  }
+}
+
 // Create cache instances
 const caches = {};
 
@@ -281,8 +314,24 @@ class CacheManager {
    * @returns {Promise<any>} Cached or computed value
    */
   static async getOrSet(cacheType, key, fn, ttl = null) {
+    const redisKey = `${cacheType}:${key}`;
+    const effectiveTtl = ttl || (cacheConfigs[cacheType] && cacheConfigs[cacheType].stdTTL) || 300;
+
     try {
-      // Try to get from cache first
+      // 1. Check Redis if ready
+      if (redisClient && redisClient.status === 'ready') {
+        try {
+          const cachedRedis = await redisClient.get(redisKey);
+          if (cachedRedis !== null) {
+            logger.debug(`Redis Cache HIT: ${redisKey}`);
+            return JSON.parse(cachedRedis);
+          }
+        } catch (rErr) {
+          logger.warn(`Redis GET failed (${rErr.message}), falling back to memory/fn`);
+        }
+      }
+
+      // 2. Try in-memory cache
       let value = this.get(cacheType, key);
       
       if (value !== null) {
@@ -290,13 +339,21 @@ class CacheManager {
         return value;
       }
       
-      // Cache miss - execute function
+      // 3. Cache miss - execute function
       logger.debug(`Cache MISS: ${cacheType}:${key} - executing function`);
       value = await fn();
       
-      // Cache the result
+      // 4. Cache the result in memory and Redis
       if (value !== null && value !== undefined) {
         this.set(cacheType, key, value, ttl);
+
+        if (redisClient && redisClient.status === 'ready') {
+          try {
+            await redisClient.set(redisKey, JSON.stringify(value), 'EX', effectiveTtl);
+          } catch (rSetErr) {
+            logger.warn(`Redis SET failed (${rSetErr.message})`);
+          }
+        }
       }
       
       return value;

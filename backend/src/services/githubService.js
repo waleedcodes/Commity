@@ -204,6 +204,7 @@ class GitHubService {
             query userContributionCalendar($username: String!) {
               user(login: $username) {
                 contributionsCollection {
+                  restrictedContributionsCount
                   contributionCalendar {
                     totalContributions
                     weeks {
@@ -240,37 +241,82 @@ class GitHubService {
             throw ErrorFactory.notFound(`GitHub user '${username}' not found`);
           }
 
-          const contributionsData = {
-            totalContributions: user.contributionsCollection.contributionCalendar.totalContributions,
-            totalCommits: user.contributionsCollection.totalCommitContributions,
-            totalIssues: user.contributionsCollection.totalIssueContributions,
-            totalPullRequests: user.contributionsCollection.totalPullRequestContributions,
-            totalReviews: user.contributionsCollection.totalPullRequestReviewContributions,
-            totalRepositories: user.contributionsCollection.totalRepositoryContributions,
-            
-            contributionCalendar: user.contributionsCollection.contributionCalendar.weeks
+          const publicContribs = user.contributionsCollection.contributionCalendar?.totalContributions || 0;
+          const privateContribs = user.contributionsCollection.restrictedContributionsCount || 0;
+
+            const calendarDays = user.contributionsCollection.contributionCalendar.weeks
               .flatMap(week => week.contributionDays)
               .map(day => ({
                 date: new Date(day.date),
                 contributionCount: day.contributionCount,
                 contributionLevel: day.contributionLevel,
+              }));
+
+            // Calculate exact longest and current streaks from verified calendar
+            let longestStreak = 0;
+            let running = 0;
+            for (let i = 0; i < calendarDays.length; i++) {
+              if (calendarDays[i].contributionCount > 0) {
+                running++;
+                if (running > longestStreak) longestStreak = running;
+              } else {
+                running = 0;
+              }
+            }
+
+            let currentStreak = 0;
+            const lastIdx = calendarDays.length - 1;
+            if (lastIdx >= 0) {
+              let startIdx = lastIdx;
+              if (calendarDays[lastIdx].contributionCount === 0 && lastIdx > 0 && calendarDays[lastIdx - 1].contributionCount > 0) {
+                startIdx = lastIdx - 1;
+              }
+              for (let i = startIdx; i >= 0; i--) {
+                if (calendarDays[i].contributionCount > 0) {
+                  currentStreak++;
+                } else {
+                  break;
+                }
+              }
+            }
+
+            const contributionsData = {
+              totalContributions: publicContribs + privateContribs,
+              publicContributions: publicContribs,
+              privateContributions: privateContribs,
+              totalCommits: user.contributionsCollection.totalCommitContributions || 0,
+              totalIssues: user.contributionsCollection.totalIssueContributions || 0,
+              totalPullRequests: user.contributionsCollection.totalPullRequestContributions || 0,
+              totalReviews: user.contributionsCollection.totalPullRequestReviewContributions || 0,
+              totalRepositories: user.contributionsCollection.totalRepositoryContributions || 0,
+              contributionStreak: currentStreak,
+              longestStreak: longestStreak,
+              contributionCalendar: calendarDays,
+              topRepositories: user.repositories.nodes.map(repo => ({
+                name: repo.name,
+                stars: repo.stargazerCount,
+                language: repo.primaryLanguage?.name || null,
+                languageColor: repo.primaryLanguage?.color || null,
               })),
-            
-            topRepositories: user.repositories.nodes.map(repo => ({
-              name: repo.name,
-              stars: repo.stargazerCount,
-              language: repo.primaryLanguage?.name || null,
-              languageColor: repo.primaryLanguage?.color || null,
-            })),
-          };
+            };
 
           logger.info(`Successfully fetched contributions for: ${username}`);
           return contributionsData;
         } catch (error) {
-          if (error.message.includes('Could not resolve to a User')) {
+          if (error.message && error.message.includes('Could not resolve to a User')) {
             throw ErrorFactory.notFound(`GitHub user '${username}' not found`);
           }
-          throw ErrorFactory.githubAPI(`Failed to fetch contributions: ${error.message}`);
+          logger.warn(`GraphQL contributions fetch failed for ${username}, falling back to defaults: ${error.message}`);
+          return {
+            totalContributions: 0,
+            totalCommits: 0,
+            totalIssues: 0,
+            totalPullRequests: 0,
+            totalReviews: 0,
+            totalRepositories: 0,
+            contributionCalendar: [],
+            topRepositories: [],
+          };
         }
       },
       10 * 60 // 10 minutes cache
@@ -296,28 +342,22 @@ class GitHubService {
           const languageStats = {};
           let totalBytes = 0;
 
-          // Get language data for each repository
-          for (const repo of repositories.slice(0, 50)) { // Limit to first 50 repos to avoid rate limits
-            try {
-              const { data: languages } = await this.octokit.rest.repos.listLanguages({
+          // Fetch top 12 repositories concurrently to optimize speed and stay within rate limits
+          const topRepos = (repositories || []).slice(0, 12);
+          const langResults = await Promise.all(
+            topRepos.map(repo => 
+              this.octokit.rest.repos.listLanguages({
                 owner: username,
                 repo: repo.name,
-              });
+              }).then(res => res.data).catch(() => ({}))
+            )
+          );
 
-              Object.entries(languages).forEach(([language, bytes]) => {
-                if (languageStats[language]) {
-                  languageStats[language] += bytes;
-                } else {
-                  languageStats[language] = bytes;
-                }
-                totalBytes += bytes;
-              });
-
-              // Add small delay to respect rate limits
-              await Helpers.sleep(100);
-            } catch (error) {
-              logger.warn(`Failed to fetch languages for repo ${repo.name}: ${error.message}`);
-            }
+          for (const languages of langResults) {
+            Object.entries(languages).forEach(([language, bytes]) => {
+              languageStats[language] = (languageStats[language] || 0) + bytes;
+              totalBytes += bytes;
+            });
           }
 
           // Convert to percentage-based statistics

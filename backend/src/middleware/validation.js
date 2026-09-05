@@ -71,12 +71,14 @@ const queryParamsSchema = Joi.object({
   limit: Joi.number().integer().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
   sort: Joi.string().valid(
     'username', 'name', 'totalCommits', 'followers', 'publicRepos', 
-    'createdAt', 'updatedAt', 'globalRank'
+    'createdAt', 'updatedAt', 'globalRank',
+    'totalContributions', 'publicContributions', 'privateContributions',
+    'contributionStreak', 'longestStreak'
   ).default('totalCommits'),
   order: Joi.string().valid('asc', 'desc').default('desc'),
-  search: Joi.string().trim().max(100).optional(),
-  location: Joi.string().trim().max(100).optional(),
-  language: Joi.string().trim().max(50).optional(),
+  search: Joi.string().trim().max(100).optional().allow(''),
+  location: Joi.string().trim().max(100).optional().allow(''),
+  language: Joi.string().trim().max(50).optional().allow(''),
   minCommits: Joi.number().integer().min(0).optional(),
   maxCommits: Joi.number().integer().min(0).optional(),
   minFollowers: Joi.number().integer().min(0).optional(),
@@ -106,13 +108,16 @@ const leaderboardQuerySchema = Joi.object({
     'commits', 'repositories', 'followers', 'contributions', 'streak'
   ).default('commits'),
   period: Joi.string()
-    .valid(...Object.values(ANALYTICS_PERIODS))
+    .valid(...Object.values(ANALYTICS_PERIODS), 'allTime', '1d', '7d', '30d', '90d', '365d')
     .default(ANALYTICS_PERIODS.ALL_TIME),
-  location: Joi.string().trim().max(100).optional(),
-  language: Joi.string().trim().max(50).optional(),
+  timeframe: Joi.string().optional(),
+  search: Joi.string().trim().max(100).optional().allow(''),
+  location: Joi.string().trim().max(100).optional().allow(''),
+  language: Joi.string().trim().max(50).optional().allow(''),
   page: Joi.number().integer().min(1).default(PAGINATION.DEFAULT_PAGE),
   limit: Joi.number().integer().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
-});
+  t: Joi.any().optional(),
+}).unknown(true);
 
 // Repository data schema
 const repositorySchema = Joi.object({
@@ -180,10 +185,14 @@ const githubWebhookSchema = Joi.object({
  */
 const validateQuery = (schema) => {
   return (req, res, next) => {
+    if (req.query && req.query.timeframe && !req.query.period) {
+      req.query.period = req.query.timeframe === 'allTime' ? 'all_time' : req.query.timeframe;
+    }
+
     const { error, value } = schema.validate(req.query, {
       abortEarly: false,
-      allowUnknown: false,
-      stripUnknown: true,
+      allowUnknown: true,
+      stripUnknown: false,
     });
 
     if (error) {
@@ -196,7 +205,7 @@ const validateQuery = (schema) => {
       return next(ErrorFactory.badRequest('Query validation failed', { validationErrors: details }));
     }
 
-    req.query = value;
+    req.query = { ...req.query, ...value };
     next();
   };
 };

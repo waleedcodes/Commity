@@ -1,5 +1,18 @@
 const request = require('supertest');
+const mongoose = require('mongoose');
 const app = require('../src/index');
+
+jest.setTimeout(35000);
+
+beforeAll(async () => {
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/github-analytics');
+  }
+});
+
+afterAll(async () => {
+  await mongoose.disconnect();
+});
 
 describe('Health Check Endpoint', () => {
   test('GET /health should return 200', async () => {

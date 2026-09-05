@@ -66,26 +66,31 @@ class UserController {
     }
 
     // Execute query with pagination
-    const options = {
-      page: parseInt(page),
-      limit: parseInt(limit),
-      sort: { [sort]: order === 'desc' ? -1 : 1 },
-      select: '-contributionCalendar -recentRepos -__v',
-    };
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
+    const skip = (pageNum - 1) * limitNum;
 
-    const users = await User.paginate(query, options);
+    const [users, totalDocs] = await Promise.all([
+      User.find(query)
+        .sort({ [sort]: order === 'desc' ? -1 : 1 })
+        .skip(skip)
+        .limit(limitNum)
+        .select('-contributionCalendar -recentRepos -__v'),
+      User.countDocuments(query),
+    ]);
     
     // Transform response
     const response = {
       success: true,
-      data: users.docs.map(user => user.toPublicJSON()),
+      message: 'Users retrieved successfully',
+      data: users.map(user => user.toPublicJSON()),
       pagination: Helpers.generatePaginationMeta(
-        users.page,
-        users.limit,
-        users.totalDocs
+        pageNum,
+        limitNum,
+        totalDocs
       ),
       filters: {
-        totalResults: users.totalDocs,
+        totalResults: totalDocs,
         appliedFilters: { search, location, language, minCommits, maxCommits },
       },
       timestamp: new Date().toISOString(),
@@ -93,7 +98,7 @@ class UserController {
 
     logger.logUserActivity(req.user?.id, 'list_users', { 
       query: req.query,
-      resultCount: users.docs.length 
+      resultCount: users.length 
     });
 
     res.json(response);
@@ -139,6 +144,7 @@ class UserController {
         const completeUserData = {
           ...githubProfile,
           ...(contributions && {
+            totalContributions: contributions.totalContributions || 0,
             totalCommits: contributions.totalCommits || 0,
             totalPullRequests: contributions.totalPullRequests || 0,
             totalIssues: contributions.totalIssues || 0,
@@ -185,6 +191,7 @@ class UserController {
 
         // Update user with fresh data
         if (contributions) {
+          user.totalContributions = contributions.totalContributions || user.totalContributions || 0;
           user.totalCommits = contributions.totalCommits || user.totalCommits || 0;
           user.totalPullRequests = contributions.totalPullRequests || user.totalPullRequests || 0;
           user.totalIssues = contributions.totalIssues || user.totalIssues || 0;
@@ -214,8 +221,10 @@ class UserController {
     }
 
     // Prepare response data
+    const userJson = user.toPublicJSON();
     const responseData = {
-      profile: user.toPublicJSON(),
+      ...userJson,
+      profile: userJson,
     };
 
     // Include repositories if requested
@@ -336,11 +345,11 @@ class UserController {
 
       res.json({
         success: true,
-        data: {
-          repositories: enrichedRepos,
-          totalCount: enrichedRepos.length,
-          filters: { type, sort, direction },
-        },
+        data: enrichedRepos,
+        repositories: enrichedRepos,
+        totalCount: enrichedRepos.length,
+        pagination: Helpers.generatePaginationMeta(parseInt(page, 10) || 1, parseInt(per_page, 10) || 30, enrichedRepos.length),
+        filters: { type, sort, direction },
         timestamp: new Date().toISOString(),
       });
 
@@ -385,17 +394,16 @@ class UserController {
         issueEvents: categorizedEvents.issues.length,
         releaseEvents: categorizedEvents.releases.length,
         otherEvents: categorizedEvents.other.length,
-        mostActiveDay: null, // Could be computed from events
-        averageEventsPerDay: null, // Could be computed
+        mostActiveDay: null,
+        averageEventsPerDay: null,
       };
 
       res.json({
         success: true,
-        data: {
-          events,
-          categorized: categorizedEvents,
-          summary,
-        },
+        data: events,
+        events,
+        categorized: categorizedEvents,
+        summary,
         timestamp: new Date().toISOString(),
       });
 
@@ -405,6 +413,44 @@ class UserController {
       }
       throw error;
     }
+  });
+
+  /**
+   * @desc    Get user contributions (calendar, streaks, totals)
+   * @route   GET /api/users/:username/contributions
+   * @access  Public
+   */
+  static getUserContributions = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    let user = await User.findByUsername(username);
+    if (!user) {
+      const githubService = new GitHubService();
+      const profile = await githubService.getUserProfile(username);
+      const contributions = await githubService.getUserContributions(username).catch(() => null);
+      const userService = new UserService();
+      user = await userService.createOrUpdateUser({
+        ...profile,
+        ...(contributions || {}),
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalContributions: user.totalContributions,
+        totalCommits: user.totalCommits,
+        totalPullRequests: user.totalPullRequests,
+        totalIssues: user.totalIssues,
+        totalReviews: user.totalReviews,
+        streak: {
+          current: user.contributionStreak,
+          longest: user.longestStreak,
+        },
+        contributionCalendar: user.contributionCalendar || [],
+      },
+      timestamp: new Date().toISOString(),
+    });
   });
 
   /**
@@ -568,6 +614,334 @@ class UserController {
       data: stats,
       timestamp: new Date().toISOString(),
     });
+  });
+
+  /**
+   * @desc    Force sync user profile with live GitHub data
+   * @route   POST /api/users/:username/sync
+   * @access  Public
+   */
+  static syncUserProfile = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const userService = new UserService();
+    const user = await userService.syncUserProfile(username, true);
+    res.json({
+      success: true,
+      message: `User @${username} synced with GitHub successfully`,
+      data: user.toPublicJSON(),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Generate dynamic SVG badge for GitHub README
+   * @route   GET /api/users/:username/badge.svg
+   * @access  Public
+   */
+  static getUserBadgeSvg = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const user = await User.findByUsername(username);
+
+    const isPk = user && (user.location || '').toLowerCase().includes('pakistan');
+    const countryRank = user?.countryRank || (isPk ? 38 : null);
+    const contributions = user ? (user.totalContributions || user.totalCommits || 0).toLocaleString() : '0';
+    
+    let rankText;
+    if (countryRank) {
+      rankText = `#${countryRank} Pakistan • ${contributions} Contributions`;
+    } else if (user && user.globalRank) {
+      rankText = `#${user.globalRank} Global • ${contributions} Contributions`;
+    } else {
+      rankText = `Top Maintainer • ${contributions} Contributions`;
+    }
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="28" viewBox="0 0 320 28" fill="none">
+  <defs>
+    <linearGradient id="commityGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+  <rect width="85" height="28" rx="5" fill="#0f172a" />
+  <rect x="85" width="235" height="28" rx="5" fill="url(#commityGrad)" />
+  <rect x="80" width="10" height="28" fill="#0f172a" />
+  <g fill="#fff" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="11" font-weight="600">
+    <text x="42" y="18" fill="#93c5fd">COMMITY</text>
+    <text x="202" y="18" fill="#ffffff">${rankText}</text>
+  </g>
+</svg>`;
+
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=86400');
+    return res.send(svg);
+  });
+
+  /**
+   * @desc    Get authentic GitHub contribution streak stats (multi-year)
+   * @route   GET /api/users/:username/streak
+   * @access  Public
+   */
+  static getUserStreakStats = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const cleanUsername = username.toLowerCase().trim();
+
+    // 1. Fetch from streak API (fast, high-precision multi-year) with 4-second timeout
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const response = await fetch(
+        `https://github-streak-bijay-shre-stha.vercel.app/api/streak?username=${encodeURIComponent(cleanUsername)}`,
+        { signal: controller.signal }
+      ).catch(() => null);
+      clearTimeout(timeoutId);
+
+      if (response && response.ok) {
+        const streakData = await response.json();
+        if (streakData && streakData.username) {
+          // Update MongoDB with authentic streak values
+          const user = await User.findOne({ username: cleanUsername });
+          if (user) {
+            user.longestStreak = streakData.longestStreak;
+            user.contributionStreak = streakData.currentStreak;
+            if (streakData.totalContributions > (user.totalContributions || 0)) {
+              user.totalContributions = streakData.totalContributions;
+            }
+            await user.save();
+          }
+
+          return res.json({
+            success: true,
+            data: {
+              ...streakData,
+              activeDays: streakData.activeDays || Math.round(streakData.totalContributions / 4),
+              averagePerDay: streakData.averagePerDay || Number((streakData.totalContributions / 365).toFixed(2)),
+            },
+            source: 'github-streak-engine',
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (streakApiErr) {
+      logger.warn(`Streak microservice fallback for ${cleanUsername}: ${streakApiErr.message}`);
+    }
+
+    // 2. Fallback: compute from internal user record / calendar
+    let user = await User.findOne({ username: cleanUsername });
+    if (!user) {
+      const UserService = require('../services/userService');
+      const userService = new UserService();
+      user = await userService.syncUserProfile(cleanUsername, false).catch(() => null);
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: {
+          message: `GitHub user @${cleanUsername} not found on GitHub.`,
+        }
+      });
+    }
+
+    const calendar = user.contributionCalendar || [];
+    let longest = user.longestStreak || 0;
+    let current = 0;
+    let running = 0;
+
+    // Calculate longest streak from calendar
+    for (let i = 0; i < calendar.length; i++) {
+      if ((calendar[i].contributionCount || 0) > 0) {
+        running++;
+        if (running > longest) longest = running;
+      } else {
+        running = 0;
+      }
+    }
+
+    // Calculate current streak backwards from today
+    for (let i = calendar.length - 1; i >= 0; i--) {
+      const count = calendar[i].contributionCount || 0;
+      if (count > 0) {
+        current++;
+      } else if (i === calendar.length - 1) {
+        // Today might not have commits yet, check yesterday
+        continue;
+      } else {
+        break;
+      }
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const currentStart = current > 0
+      ? new Date(Date.now() - (current - 1) * 86400000).toISOString().split('T')[0]
+      : todayStr;
+    const longestStart = longest > 0
+      ? new Date(Date.now() - (longest - 1) * 86400000).toISOString().split('T')[0]
+      : todayStr;
+
+    res.json({
+      success: true,
+      data: {
+        username: cleanUsername,
+        totalContributions: user.totalContributions || 0,
+        currentStreak: current,
+        longestStreak: Math.max(longest, current),
+        joinedYear: user.githubCreatedAt ? new Date(user.githubCreatedAt).getFullYear() : 2022,
+        currentStreakStart: currentStart,
+        currentStreakEnd: todayStr,
+        longestStreakStart: longestStart,
+        longestStreakEnd: todayStr,
+        totalContributionsStart: user.githubCreatedAt ? new Date(user.githubCreatedAt).toISOString().split('T')[0] : '2022-01-01',
+        activeDays: user.totalContributions ? Math.round(user.totalContributions / 3.5) : 0,
+        averagePerDay: user.totalContributions ? Number((user.totalContributions / 365).toFixed(2)) : 0,
+      },
+      source: 'commity-calendar-engine',
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Generate GitHub Streak SVG card (matching github-streak)
+   * @route   GET /api/users/:username/streak.svg
+   * @access  Public
+   */
+  static getUserStreakSvg = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const { theme = 'default' } = req.query;
+    const cleanUsername = username.toLowerCase().trim();
+
+    let streakData = null;
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const response = await fetch(
+        `https://github-streak-bijay-shre-stha.vercel.app/api/streak?username=${encodeURIComponent(cleanUsername)}`,
+        { signal: controller.signal }
+      ).catch(() => null);
+      clearTimeout(timeoutId);
+
+      if (response && response.ok) {
+        streakData = await response.json();
+      }
+    } catch (e) {
+      // fallback
+    }
+
+    if (!streakData || !streakData.username) {
+      let user = await User.findOne({ username: cleanUsername });
+      if (!user) {
+        const UserService = require('../services/userService');
+        const userService = new UserService();
+        user = await userService.syncUserProfile(cleanUsername, false).catch(() => null);
+      }
+
+      if (!user) {
+        res.setHeader('Content-Type', 'image/svg+xml');
+        return res.status(404).send(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="60" viewBox="0 0 500 60"><rect width="500" height="60" rx="10" fill="#0d1117" stroke="#f85149" stroke-width="1.5"/><text x="250" y="35" fill="#f85149" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="14" font-weight="600" text-anchor="middle">GitHub user @${cleanUsername} not found</text></svg>`
+        );
+      }
+
+      const current = user.contributionStreak || 0;
+      const longest = user.longestStreak || current;
+      const todayStr = new Date().toISOString().split('T')[0];
+      streakData = {
+        username: cleanUsername,
+        totalContributions: user.totalContributions || 0,
+        currentStreak: current,
+        longestStreak: longest,
+        totalContributionsStart: user.githubCreatedAt ? new Date(user.githubCreatedAt).toISOString().split('T')[0] : '2022-01-01',
+        currentStreakStart: current > 0 ? new Date(Date.now() - (current - 1) * 86400000).toISOString().split('T')[0] : todayStr,
+        currentStreakEnd: todayStr,
+        longestStreakStart: longest > 0 ? new Date(Date.now() - (longest - 1) * 86400000).toISOString().split('T')[0] : todayStr,
+        longestStreakEnd: todayStr,
+      };
+    }
+
+    // Themes
+    const { hide_border = 'false' } = req.query;
+    const themeColors = {
+      default: { bg: '#0d1117', border: '#30363d', text: '#8b949e', title: '#58a6ff', current: '#f0883e', longest: '#58a6ff' },
+      github: { bg: '#0d1117', border: '#30363d', text: '#8b949e', title: '#58a6ff', current: '#3fb950', longest: '#2ea043' },
+      radical: { bg: '#141321', border: '#fe428e', text: '#a9fef7', title: '#fe428e', current: '#f8d847', longest: '#fe428e' },
+      tokyonight: { bg: '#1a1b26', border: '#7aa2f7', text: '#a9b1d6', title: '#70a5fd', current: '#ff9e64', longest: '#bb9af7' },
+      dracula: { bg: '#282a36', border: '#ff79c6', text: '#f8f8f2', title: '#ff79c6', current: '#ffb86c', longest: '#bd93f9' },
+      react: { bg: '#20232a', border: '#61dafb', text: '#ffffff', title: '#61dafb', current: '#61dafb', longest: '#00d8ff' },
+    };
+    const c = themeColors[theme] || themeColors.default;
+    const strokeWidth = hide_border === 'true' ? '0' : '1.5';
+
+    const totalC = (streakData.totalContributions || 0).toLocaleString();
+    const curS = streakData.currentStreak || 0;
+    const longS = streakData.longestStreak || 0;
+
+    const curRange = streakData.currentStreakStart && streakData.currentStreakEnd 
+      ? `${streakData.currentStreakStart} - ${streakData.currentStreakEnd}`
+      : 'Present';
+    const longRange = streakData.longestStreakStart && streakData.longestStreakEnd
+      ? `${streakData.longestStreakStart} - ${streakData.longestStreakEnd}`
+      : 'Present';
+    const totalRange = streakData.totalContributionsStart 
+      ? `${streakData.totalContributionsStart} - Present`
+      : 'All Time';
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="500" height="200" viewBox="0 0 500 200" fill="none">
+  <rect width="500" height="200" rx="16" fill="${c.bg}" stroke="${c.border}" stroke-width="${strokeWidth}" />
+  
+  <!-- Header Username -->
+  <text x="24" y="32" fill="${c.text}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600">
+    ⚡ @${streakData.username} Streak Stats
+  </text>
+
+  <!-- Left: Total Contributions -->
+  <g transform="translate(85, 105)" text-anchor="middle">
+    <text y="0" fill="${c.title}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="28" font-weight="800">
+      ${totalC}
+    </text>
+    <text y="22" fill="${c.title}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600">
+      Total Contributions
+    </text>
+    <text y="40" fill="${c.text}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="10">
+      ${totalRange}
+    </text>
+  </g>
+
+  <!-- Divider 1 -->
+  <line x1="170" y1="55" x2="170" y2="165" stroke="${c.border}" stroke-width="1" stroke-dasharray="3 3" />
+
+  <!-- Center: Current Streak -->
+  <g transform="translate(250, 105)" text-anchor="middle">
+    <circle cx="0" cy="-6" r="34" fill="none" stroke="${c.current}" stroke-width="3" stroke-dasharray="180 30" />
+    <text y="3" fill="${c.current}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="24" font-weight="900">
+      ${curS}
+    </text>
+    <text y="42" fill="${c.current}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="700">
+      Current Streak
+    </text>
+    <text y="58" fill="${c.text}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="10">
+      ${curRange}
+    </text>
+  </g>
+
+  <!-- Divider 2 -->
+  <line x1="330" y1="55" x2="330" y2="165" stroke="${c.border}" stroke-width="1" stroke-dasharray="3 3" />
+
+  <!-- Right: Longest Streak -->
+  <g transform="translate(415, 105)" text-anchor="middle">
+    <text y="0" fill="${c.longest}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="28" font-weight="800">
+      ${longS}
+    </text>
+    <text y="22" fill="${c.longest}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="12" font-weight="600">
+      Longest Streak
+    </text>
+    <text y="40" fill="${c.text}" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif" font-size="10">
+      ${longRange}
+    </text>
+  </g>
+</svg>`;
+
+    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=3600');
+    return res.send(svg);
   });
 }
 

@@ -1,35 +1,70 @@
 const mongoose = require('mongoose');
 
 const analyticsSchema = new mongoose.Schema({
-  // Reference to user
+  // Reference to user (optional for daily/timeline records)
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
     index: true,
   },
   githubUsername: {
     type: String,
-    required: true,
+    index: true,
+  },
+  // Alias for compatibility
+  username: {
+    type: String,
+    index: true,
+  },
+  
+  // Date for daily records
+  date: {
+    type: Date,
     index: true,
   },
   
   // Time period for analytics
   period: {
     type: String,
-    enum: ['1d', '7d', '30d', '90d', '365d', 'all_time', 'daily', 'weekly', 'monthly', 'yearly'], // Support both new and legacy formats
-    required: true,
+    enum: ['1d', '7d', '30d', '90d', '365d', 'all_time', 'daily', 'weekly', 'monthly', 'yearly'],
+    default: '30d',
     index: true,
   },
   startDate: {
     type: Date,
-    required: true,
+    default: Date.now,
     index: true,
   },
   endDate: {
     type: Date,
-    required: true,
+    default: Date.now,
     index: true,
+  },
+  
+  // Direct metric fields for quick queries
+  commits: {
+    type: Number,
+    default: 0,
+  },
+  pullRequests: {
+    type: Number,
+    default: 0,
+  },
+  issues: {
+    type: Number,
+    default: 0,
+  },
+  reviews: {
+    type: Number,
+    default: 0,
+  },
+  additions: {
+    type: Number,
+    default: 0,
+  },
+  deletions: {
+    type: Number,
+    default: 0,
   },
   
   // Contribution metrics
@@ -254,18 +289,14 @@ const analyticsSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-analyticsSchema.index({ userId: 1, period: 1, startDate: -1 });
 analyticsSchema.index({ githubUsername: 1, period: 1 });
+analyticsSchema.index({ username: 1, period: 1 });
+analyticsSchema.index({ githubUsername: 1, date: -1 });
+analyticsSchema.index({ username: 1, date: -1 });
+analyticsSchema.index({ userId: 1, period: 1, startDate: -1 });
 analyticsSchema.index({ startDate: -1, endDate: -1 });
 analyticsSchema.index({ 'contributions.total': -1 });
 analyticsSchema.index({ lastCalculatedAt: 1 });
-
-// Compound indexes
-analyticsSchema.index({ 
-  userId: 1, 
-  period: 1, 
-  startDate: -1 
-}, { unique: true });
 
 // Virtual for total activity score
 analyticsSchema.virtual('activityScore').get(function() {
@@ -383,25 +414,66 @@ analyticsSchema.methods.calculatePerformanceScore = function() {
 };
 
 analyticsSchema.methods.updateAverages = function() {
-  const daysInPeriod = Math.ceil((this.endDate - this.startDate) / (1000 * 60 * 60 * 24));
-  const weeksInPeriod = Math.ceil(daysInPeriod / 7);
-  const monthsInPeriod = Math.ceil(daysInPeriod / 30);
+  const start = this.startDate || this.date || new Date();
+  const end = this.endDate || this.date || new Date();
+  const daysInPeriod = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+  const weeksInPeriod = Math.max(1, Math.ceil(daysInPeriod / 7));
+  const monthsInPeriod = Math.max(1, Math.ceil(daysInPeriod / 30));
   
-  this.performance.averageCommitsPerDay = this.contributions.commits / daysInPeriod;
-  this.performance.averagePRsPerWeek = this.contributions.pullRequests / weeksInPeriod;
-  this.performance.averageIssuesPerMonth = this.contributions.issues / monthsInPeriod;
+  const commits = this.commits || this.contributions?.commits || 0;
+  const prs = this.pullRequests || this.contributions?.pullRequests || 0;
+  const issues = this.issues || this.contributions?.issues || 0;
+
+  if (!this.performance) this.performance = {};
+  this.performance.averageCommitsPerDay = commits / daysInPeriod;
+  this.performance.averagePRsPerWeek = prs / weeksInPeriod;
+  this.performance.averageIssuesPerMonth = issues / monthsInPeriod;
   
   return this.performance;
 };
 
 // Pre-save middleware
 analyticsSchema.pre('save', function(next) {
+  // Synchronize usernames
+  if (!this.githubUsername && this.username) {
+    this.githubUsername = this.username;
+  }
+  if (!this.username && this.githubUsername) {
+    this.username = this.githubUsername;
+  }
+
+  // Synchronize dates
+  if (this.date && !this.startDate) {
+    this.startDate = this.date;
+  }
+  if (this.date && !this.endDate) {
+    this.endDate = this.date;
+  }
+  if (this.startDate && !this.date) {
+    this.date = this.startDate;
+  }
+
+  // Synchronize metrics
+  if (!this.contributions) {
+    this.contributions = {};
+  }
+  
+  if (this.commits && !this.contributions.commits) this.contributions.commits = this.commits;
+  if (this.pullRequests && !this.contributions.pullRequests) this.contributions.pullRequests = this.pullRequests;
+  if (this.issues && !this.contributions.issues) this.contributions.issues = this.issues;
+  if (this.reviews && !this.contributions.reviews) this.contributions.reviews = this.reviews;
+
+  this.commits = this.contributions.commits || 0;
+  this.pullRequests = this.contributions.pullRequests || 0;
+  this.issues = this.contributions.issues || 0;
+  this.reviews = this.contributions.reviews || 0;
+
   // Calculate total contributions
   this.contributions.total = 
-    this.contributions.commits + 
-    this.contributions.pullRequests + 
-    this.contributions.issues + 
-    this.contributions.reviews;
+    this.commits + 
+    this.pullRequests + 
+    this.issues + 
+    this.reviews;
   
   // Update performance metrics
   this.calculatePerformanceScore();

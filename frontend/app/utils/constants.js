@@ -9,12 +9,12 @@ export const DATE_RANGES = {
 
 // Leaderboard categories
 export const LEADERBOARD_CATEGORIES = {
-  commits: 'Total Commits',
-  repositories: 'Public Repositories',
+  contributions: 'All (Public & Private)',
+  public_contributions: 'Public Only',
+  commits: 'Commits Only',
+  repositories: 'Repositories',
   followers: 'Followers',
-  contributions: 'Contributions',
-  stars: 'Stars Received',
-  streak: 'Current Streak'
+  streak: 'Streak'
 };
 
 // Leaderboard time frames

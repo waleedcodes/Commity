@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { userService } from '../services/userService';
 import { LOADING_STATES } from '../utils/constants';
 
@@ -8,24 +8,26 @@ export const useUsers = (params = {}) => {
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState(null);
 
-  const fetchUsers = async (newParams = {}) => {
+  const fetchUsers = useCallback(async (newParams = {}) => {
     setLoading(LOADING_STATES.LOADING);
     setError(null);
 
     try {
       const response = await userService.getAllUsers({ ...params, ...newParams });
-      setUsers(response.data);
+      const rawData = response.data;
+      const userList = Array.isArray(rawData) ? rawData : (rawData?.users || []);
+      setUsers(userList);
       setPagination(response.pagination);
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [params.page, params.limit, params.sort, params.order]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   const refetch = (newParams = {}) => fetchUsers(newParams);
 
@@ -43,7 +45,7 @@ export const useUser = (username) => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchUser = async () => {
+  const fetchUser = useCallback(async () => {
     if (!username) return;
 
     setLoading(LOADING_STATES.LOADING);
@@ -51,26 +53,26 @@ export const useUser = (username) => {
 
     try {
       const response = await userService.getUserProfile(username);
-      setUser(response.data.profile || response.data);
+      setUser(response.data?.profile || response.data);
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [username]);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (!username) return;
 
     try {
       await userService.refreshUserData(username);
-      await fetchUser(); // Refetch after refresh
+      await fetchUser();
     } catch (err) {
       setError(err.message);
     }
-  };
+  }, [username, fetchUser]);
 
-  const updateUser = async (data) => {
+  const updateUser = useCallback(async (data) => {
     if (!username) return;
 
     try {
@@ -81,11 +83,11 @@ export const useUser = (username) => {
       setError(err.message);
       throw err;
     }
-  };
+  }, [username]);
 
   useEffect(() => {
     fetchUser();
-  }, [username]);
+  }, [fetchUser]);
 
   return {
     user,
@@ -102,7 +104,7 @@ export const useUserSearch = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const searchUsers = async (query, params = {}) => {
+  const searchUsers = useCallback(async (query, params = {}) => {
     if (!query.trim()) {
       setResults([]);
       return;
@@ -113,19 +115,20 @@ export const useUserSearch = () => {
 
     try {
       const response = await userService.searchUsers(query, params);
-      setResults(response.data);
+      const rawData = response.data;
+      setResults(Array.isArray(rawData) ? rawData : (rawData?.users || []));
     } catch (err) {
       setError(err.message);
       setResults([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const clearResults = () => {
+  const clearResults = useCallback(() => {
     setResults([]);
     setError(null);
-  };
+  }, []);
 
   return {
     results,
@@ -141,7 +144,7 @@ export const useUserActivity = (username) => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchActivity = async (params = {}) => {
+  const fetchActivity = useCallback(async (params = {}) => {
     if (!username) return;
 
     setLoading(LOADING_STATES.LOADING);
@@ -149,17 +152,18 @@ export const useUserActivity = (username) => {
 
     try {
       const response = await userService.getUserActivity(username, params);
-      setActivity(response.data);
+      const rawData = response.data;
+      setActivity(Array.isArray(rawData) ? rawData : (rawData?.events || []));
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [username]);
 
   useEffect(() => {
     fetchActivity();
-  }, [username]);
+  }, [fetchActivity]);
 
   return {
     activity,
@@ -174,7 +178,7 @@ export const useUserRepositories = (username) => {
   const [loading, setLoading] = useState(LOADING_STATES.IDLE);
   const [error, setError] = useState(null);
 
-  const fetchRepositories = async (params = {}) => {
+  const fetchRepositories = useCallback(async (params = {}) => {
     if (!username) return;
 
     setLoading(LOADING_STATES.LOADING);
@@ -182,22 +186,56 @@ export const useUserRepositories = (username) => {
 
     try {
       const response = await userService.getUserRepositories(username, params);
-      setRepositories(response.data);
+      const rawData = response.data;
+      setRepositories(Array.isArray(rawData) ? rawData : (rawData?.repositories || []));
       setLoading(LOADING_STATES.SUCCESS);
     } catch (err) {
       setError(err.message);
       setLoading(LOADING_STATES.ERROR);
     }
-  };
+  }, [username]);
 
   useEffect(() => {
     fetchRepositories();
-  }, [username]);
+  }, [fetchRepositories]);
 
   return {
     repositories,
     loading: loading === LOADING_STATES.LOADING,
     error,
     refetch: fetchRepositories
+  };
+};
+
+export const useUserStreak = (username) => {
+  const [streak, setStreak] = useState(null);
+  const [loading, setLoading] = useState(LOADING_STATES.IDLE);
+  const [error, setError] = useState(null);
+
+  const fetchStreak = useCallback(async () => {
+    if (!username) return;
+
+    setLoading(LOADING_STATES.LOADING);
+    setError(null);
+
+    try {
+      const response = await userService.getUserStreak(username);
+      setStreak(response.data);
+      setLoading(LOADING_STATES.SUCCESS);
+    } catch (err) {
+      setError(err.message);
+      setLoading(LOADING_STATES.ERROR);
+    }
+  }, [username]);
+
+  useEffect(() => {
+    fetchStreak();
+  }, [fetchStreak]);
+
+  return {
+    streak,
+    loading: loading === LOADING_STATES.LOADING,
+    error,
+    refetch: fetchStreak
   };
 };

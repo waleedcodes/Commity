@@ -105,22 +105,25 @@ class AnalyticsController {
           ]),
 
           // Contribution trends (if charts enabled)
-          includeCharts === 'true' ? Analytics.aggregate([
+          (String(includeCharts) === 'true' || includeCharts === true) ? Analytics.aggregate([
             {
               $match: {
-                date: { $gte: dateRange.start, $lte: dateRange.end }
+                $or: [
+                  { date: { $gte: dateRange.start, $lte: dateRange.end } },
+                  { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+                ]
               }
             },
             {
               $group: {
                 _id: {
-                  year: { $year: '$date' },
-                  month: { $month: '$date' },
-                  day: { $dayOfMonth: '$date' }
+                  year: { $year: { $ifNull: ['$date', '$startDate'] } },
+                  month: { $month: { $ifNull: ['$date', '$startDate'] } },
+                  day: { $dayOfMonth: { $ifNull: ['$date', '$startDate'] } }
                 },
-                totalCommits: { $sum: '$commits' },
-                totalPullRequests: { $sum: '$pullRequests' },
-                totalIssues: { $sum: '$issues' },
+                totalCommits: { $sum: { $ifNull: ['$commits', '$contributions.commits', 0] } },
+                totalPullRequests: { $sum: { $ifNull: ['$pullRequests', '$contributions.pullRequests', 0] } },
+                totalIssues: { $sum: { $ifNull: ['$issues', '$contributions.issues', 0] } },
                 activeUsers: { $sum: 1 }
               }
             },
@@ -282,34 +285,74 @@ class AnalyticsController {
         const dateRange = Helpers.getDateRange(period);
 
         // Get user's analytics records
-        const userAnalytics = await Analytics.find({
-          username: user.username,
-          date: { $gte: dateRange.start, $lte: dateRange.end }
-        }).sort({ date: 1 });
+        let userAnalytics = await Analytics.find({
+          $or: [{ username: user.username }, { githubUsername: user.username }],
+          $or: [
+            { date: { $gte: dateRange.start, $lte: dateRange.end } },
+            { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+          ]
+        }).sort({ date: 1, startDate: 1 });
+
+        // If no analytics records found, synthesize from user's contributionCalendar
+        if ((!userAnalytics || userAnalytics.length === 0) && user.contributionCalendar && user.contributionCalendar.length > 0) {
+          const filteredCalendar = user.contributionCalendar.filter(item => {
+            const d = new Date(item.date);
+            return d >= dateRange.start && d <= dateRange.end;
+          });
+          
+          userAnalytics = filteredCalendar.map(item => ({
+            date: new Date(item.date),
+            commits: item.contributionCount || 0,
+            pullRequests: 0,
+            issues: 0,
+            reviews: 0,
+          }));
+        }
 
         // Calculate statistics
-        const totalStats = userAnalytics.reduce((acc, record) => ({
-          commits: acc.commits + (record.commits || 0),
-          pullRequests: acc.pullRequests + (record.pullRequests || 0),
-          issues: acc.issues + (record.issues || 0),
-          reviews: acc.reviews + (record.reviews || 0),
-          activeDays: acc.activeDays + (record.commits > 0 ? 1 : 0),
-        }), { commits: 0, pullRequests: 0, issues: 0, reviews: 0, activeDays: 0 });
+        const totalStats = userAnalytics.reduce((acc, record) => {
+          const commits = record.commits || record.contributions?.commits || 0;
+          const pullRequests = record.pullRequests || record.contributions?.pullRequests || 0;
+          const issues = record.issues || record.contributions?.issues || 0;
+          const reviews = record.reviews || record.contributions?.reviews || 0;
+          return {
+            commits: acc.commits + commits,
+            pullRequests: acc.pullRequests + pullRequests,
+            issues: acc.issues + issues,
+            reviews: acc.reviews + reviews,
+            activeDays: acc.activeDays + (commits > 0 ? 1 : 0),
+          };
+        }, { commits: 0, pullRequests: 0, issues: 0, reviews: 0, activeDays: 0 });
+
+        // If totalStats has 0 commits but user has lifetime commits, use user totals as fallback
+        if (totalStats.commits === 0 && (user.totalCommits || 0) > 0) {
+          totalStats.commits = user.totalCommits || 0;
+          totalStats.pullRequests = user.totalPullRequests || 0;
+          totalStats.issues = user.totalIssues || 0;
+          totalStats.reviews = user.totalReviews || 0;
+          totalStats.activeDays = Math.min(30, user.totalCommits || 0);
+        }
 
         // Calculate rankings
         const rankings = await this._getUserRankings(user);
 
         // Activity timeline
-        const activityTimeline = includeActivity === 'true' 
-          ? userAnalytics.map(record => ({
-              date: record.date.toISOString().split('T')[0],
-              commits: record.commits || 0,
-              pullRequests: record.pullRequests || 0,
-              issues: record.issues || 0,
-              reviews: record.reviews || 0,
-              total: (record.commits || 0) + (record.pullRequests || 0) + 
-                     (record.issues || 0) + (record.reviews || 0),
-            }))
+        const activityTimeline = (String(includeActivity) === 'true' || includeActivity === true)
+          ? userAnalytics.map(record => {
+              const recDate = record.date ? new Date(record.date) : (record.startDate ? new Date(record.startDate) : new Date());
+              const commits = record.commits || record.contributions?.commits || 0;
+              const pullRequests = record.pullRequests || record.contributions?.pullRequests || 0;
+              const issues = record.issues || record.contributions?.issues || 0;
+              const reviews = record.reviews || record.contributions?.reviews || 0;
+              return {
+                date: recDate.toISOString().split('T')[0],
+                commits,
+                pullRequests,
+                issues,
+                reviews,
+                total: commits + pullRequests + issues + reviews,
+              };
+            })
           : null;
 
         // Language analysis - get from user model or fetch fresh
@@ -440,7 +483,7 @@ class AnalyticsController {
               reviews: user.totalReviews || 0,
               contributions: user.totalContributions || 0,
               streak: {
-                current: user.currentStreak || 0,
+                current: user.contributionStreak || user.currentStreak || 0,
                 longest: user.longestStreak || 0,
               },
             },
@@ -646,7 +689,13 @@ class AnalyticsController {
    * @access  Public
    */
   static compareUsers = asyncHandler(async (req, res) => {
-    const { usernames, period = '30d', metrics = ['commits', 'pullRequests', 'issues'] } = req.body;
+    let rawUsernames = req.body?.usernames || req.query?.users || req.query?.usernames;
+    if (typeof rawUsernames === 'string') {
+      rawUsernames = rawUsernames.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    const usernames = rawUsernames;
+    const period = req.body?.period || req.query?.period || '30d';
+    const metrics = req.body?.metrics || ['commits', 'pullRequests', 'issues'];
 
     if (!usernames || !Array.isArray(usernames) || usernames.length < 2 || usernames.length > 10) {
       throw ErrorFactory.badRequest('Please provide 2-10 usernames to compare');
@@ -680,10 +729,28 @@ class AnalyticsController {
         // Get analytics for all users in the period
         const userAnalytics = {};
         for (const user of users) {
-          const analytics = await Analytics.find({
-            username: user.username,
-            date: { $gte: dateRange.start, $lte: dateRange.end }
-          }).sort({ date: 1 });
+          let analytics = await Analytics.find({
+            $or: [{ username: user.username }, { githubUsername: user.username }],
+            $or: [
+              { date: { $gte: dateRange.start, $lte: dateRange.end } },
+              { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+            ]
+          }).sort({ date: 1, startDate: 1 });
+
+          if ((!analytics || analytics.length === 0) && user.contributionCalendar) {
+            analytics = user.contributionCalendar
+              .filter(item => {
+                const d = new Date(item.date);
+                return d >= dateRange.start && d <= dateRange.end;
+              })
+              .map(item => ({
+                date: new Date(item.date),
+                commits: item.contributionCount || 0,
+                pullRequests: 0,
+                issues: 0,
+                reviews: 0,
+              }));
+          }
 
           userAnalytics[user.username] = analytics;
         }
@@ -1032,6 +1099,41 @@ class AnalyticsController {
     // Implementation for growth insights
     return { userGrowth: 0, activityGrowth: 0, predictions: {} };
   }
+
+  /**
+   * @desc    Get analytics summary
+   * @route   GET /api/analytics/summary
+   * @access  Public
+   */
+  static getAnalyticsSummary = asyncHandler(async (req, res) => {
+    const [totalUsers, totalCommits, totalRepos] = await Promise.all([
+      User.countDocuments({ isActive: true }),
+      User.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: null, total: { $sum: '$totalCommits' } } }
+      ]),
+      User.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: null, total: { $sum: '$publicRepos' } } }
+      ]),
+    ]);
+
+    const commitsSum = totalCommits[0]?.total || 0;
+    const reposSum = totalRepos[0]?.total || 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalUsers,
+        totalContributors: totalUsers,
+        totalContributions: commitsSum,
+        totalCommits: commitsSum,
+        totalRepositories: reposSum,
+        period: 'all_time',
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
 }
 
 module.exports = AnalyticsController;

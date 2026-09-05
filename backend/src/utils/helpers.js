@@ -403,12 +403,29 @@ class Helpers {
    * @param {number} size - Chunk size
    * @returns {Array} Array of chunks
    */
-  static chunkArray(array, size) {
-    const chunks = [];
-    for (let i = 0; i < array.length; i += size) {
-      chunks.push(array.slice(i, i + size));
-    }
-    return chunks;
+  /**
+   * Calculate median of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateMedian(values) {
+    if (!values || values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  }
+
+  /**
+   * Calculate standard deviation of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateStandardDeviation(values) {
+    if (!values || values.length === 0) return 0;
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const squareDiffs = values.map(val => Math.pow(val - mean, 2));
+    const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
+    return Math.sqrt(avgSquareDiff);
   }
 }
 

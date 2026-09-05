@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # Redis caching service for high-performance scale
+  redis:
+    image: redis:7-alpine
+    container_name: commity-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Express Backend API service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: commity-backend
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - PORT=5001
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI:-mongodb+srv://waleed1515king_db_user:V54EkuSEw9F12PWh@cluster0.hj9j0s7.mongodb.net/?appName=Cluster0}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - REDIS_URL=redis://redis:6379
+      - FRONTEND_URL=http://localhost:3000
+      - ENABLE_SCHEDULED_UPDATES=true
+      - UPDATE_SCHEDULE=0 2 * * *
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Next.js 15 Frontend service
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:5001/api
+    container_name: commity-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:5001/api
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:
+    driver: local

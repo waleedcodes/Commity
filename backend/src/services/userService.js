@@ -90,18 +90,23 @@ class UserService {
         const userData = {
           ...profile,
           ...(contributions && {
-            totalCommits: contributions.totalCommits,
-            totalPullRequests: contributions.totalPullRequests,
-            totalIssues: contributions.totalIssues,
-            totalReviews: contributions.totalReviews,
-            contributionCalendar: contributions.contributionCalendar,
+            totalContributions: contributions.totalContributions || 0,
+            publicContributions: contributions.publicContributions || contributions.totalContributions || 0,
+            privateContributions: contributions.privateContributions || 0,
+            totalCommits: contributions.totalCommits || 0,
+            totalPullRequests: contributions.totalPullRequests || 0,
+            totalIssues: contributions.totalIssues || 0,
+            totalReviews: contributions.totalReviews || 0,
+            contributionStreak: contributions.contributionStreak || 0,
+            longestStreak: contributions.longestStreak || 0,
+            contributionCalendar: contributions.contributionCalendar || [],
           }),
           ...(languages && { topLanguages: languages.slice(0, 10) }),
         };
 
         // Update user
         const user = await this.createOrUpdateUser(userData);
-        await user.updateRank('totalCommits');
+        await user.updateRank('totalContributions');
 
         results.success.push({
           username,
@@ -178,23 +183,29 @@ class UserService {
       const analyticsData = {
         userId,
         githubUsername: user.username,
+        username: user.username,
+        date: startDate,
         period,
         startDate,
         endDate,
+        commits: contributions.commits || 0,
+        pullRequests: contributions.pullRequests || 0,
+        issues: contributions.issues || 0,
+        reviews: contributions.reviews || 0,
         contributions,
         repositories: repositoryMetrics,
         languages: languages.map(lang => ({
           name: lang.name,
           bytes: lang.bytes,
           percentage: lang.percentage,
-          commits: 0, // Would need additional API calls to get this
+          commits: 0,
         })),
         activityPatterns,
         collaboration: collaborationMetrics,
         performance: {
-          averageCommitsPerDay: contributions.commits / this._getDaysBetween(startDate, endDate),
-          averagePRsPerWeek: contributions.pullRequests / this._getWeeksBetween(startDate, endDate),
-          averageIssuesPerMonth: contributions.issues / this._getMonthsBetween(startDate, endDate),
+          averageCommitsPerDay: contributions.commits / Math.max(1, this._getDaysBetween(startDate, endDate)),
+          averagePRsPerWeek: contributions.pullRequests / Math.max(1, this._getWeeksBetween(startDate, endDate)),
+          averageIssuesPerMonth: contributions.issues / Math.max(1, this._getMonthsBetween(startDate, endDate)),
         },
         lastCalculatedAt: new Date(),
       };
@@ -320,10 +331,11 @@ class UserService {
   }
 
   /**
-   * Check if user data was recently updated
+   * Check if user data was recently updated (Weekly snapshot cadence: 7 days)
    */
   isRecentlyUpdated(user) {
-    const threshold = 10 * 60 * 1000; // 10 minutes
+    const syncDays = parseInt(process.env.USER_SYNC_INTERVAL_DAYS, 10) || 7;
+    const threshold = syncDays * 24 * 60 * 60 * 1000;
     return user.lastFetchedAt && (Date.now() - user.lastFetchedAt.getTime()) < threshold;
   }
 
@@ -333,6 +345,65 @@ class UserService {
    */
   _isRecentlyUpdated(user) {
     return this.isRecentlyUpdated(user);
+  }
+
+  /**
+   * Synchronize single user profile with live GitHub data
+   * @param {string} username - GitHub username
+   * @param {boolean} force - Force refresh even if within 7-day snapshot window
+   * @returns {Promise<User>}
+   */
+  async syncUserProfile(username, force = false) {
+    const existingUser = await User.findByUsername(username);
+    if (existingUser && !force && this.isRecentlyUpdated(existingUser)) {
+      logger.info(`Serving smooth database snapshot for @${username} (last synced ${Math.round((Date.now() - existingUser.lastFetchedAt.getTime()) / (1000 * 60 * 60 * 24))}d ago)`);
+      return existingUser;
+    }
+
+    const GitHubService = require('./githubService');
+    const githubService = new GitHubService();
+
+    const [profile, contributions, languages] = await Promise.all([
+      githubService.getUserProfile(username),
+      githubService.getUserContributions(username).catch(err => {
+        logger.warn(`Failed to fetch contributions for ${username}: ${err.message}`);
+        return null;
+      }),
+      githubService.getUserLanguages(username).catch(err => {
+        logger.warn(`Failed to fetch languages for ${username}: ${err.message}`);
+        return null;
+      }),
+    ]);
+
+    const userData = {
+      ...profile,
+      ...(contributions && {
+        totalContributions: contributions.totalContributions || 0,
+        publicContributions: contributions.publicContributions || contributions.totalContributions || 0,
+        privateContributions: contributions.privateContributions || 0,
+        totalCommits: contributions.totalCommits || 0,
+        totalPullRequests: contributions.totalPullRequests || 0,
+        totalIssues: contributions.totalIssues || 0,
+        totalReviews: contributions.totalReviews || 0,
+        contributionStreak: contributions.contributionStreak || 0,
+        longestStreak: contributions.longestStreak || 0,
+        contributionCalendar: contributions.contributionCalendar || [],
+      }),
+      ...(languages && { 
+        topLanguages: languages.slice(0, 10).map(lang => ({
+          name: lang.name,
+          percentage: lang.percentage,
+          bytes: lang.bytes,
+          color: lang.color || '#f1c40f'
+        }))
+      }),
+      lastFetchedAt: new Date(),
+      lastAnalyticsUpdate: new Date()
+    };
+
+    const user = await this.createOrUpdateUser(userData);
+    await user.updateRank('totalContributions');
+    return user;
   }
 
   /**

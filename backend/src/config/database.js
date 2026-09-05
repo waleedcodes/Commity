@@ -6,12 +6,10 @@ const connectDB = async () => {
     const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/github-analytics';
     
     const options = {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      maxPoolSize: 10, // Maintain up to 10 socket connections
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      bufferCommands: false, // Disable mongoose buffering
+      maxPoolSize: parseInt(process.env.MONGODB_MAX_POOL_SIZE, 10) || 50,
+      minPoolSize: 5,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     };
 
     const conn = await mongoose.connect(mongoURI, options);
@@ -31,17 +29,10 @@ const connectDB = async () => {
       logger.info('MongoDB reconnected');
     });
 
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      await mongoose.connection.close();
-      logger.info('MongoDB connection closed through app termination');
-      process.exit(0);
-    });
-
+    return conn;
   } catch (error) {
     logger.error('Error connecting to MongoDB:', error.message);
-    logger.error('Full error:', error);
-    throw error; // Throw the error instead of exiting
+    throw error;
   }
 };
 

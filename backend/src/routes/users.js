@@ -37,6 +37,36 @@ router.get('/search',
 );
 
 /**
+ * @route   GET /api/users/:username/badge.svg
+ * @desc    Get dynamic SVG badge for user profile README
+ * @access  Public
+ */
+router.get('/:username/badge.svg',
+  validateGitHubUsername,
+  UserController.getUserBadgeSvg
+);
+
+/**
+ * @route   GET /api/users/:username/streak.svg
+ * @desc    Get dynamic SVG streak card for user profile README
+ * @access  Public
+ */
+router.get('/:username/streak.svg',
+  validateGitHubUsername,
+  UserController.getUserStreakSvg
+);
+
+/**
+ * @route   GET /api/users/:username/streak
+ * @desc    Get authentic GitHub contribution streak statistics
+ * @access  Public
+ */
+router.get('/:username/streak',
+  validateGitHubUsername,
+  UserController.getUserStreakStats
+);
+
+/**
  * @route   GET /api/users/:username
  * @desc    Get user profile by username
  * @access  Public
@@ -45,6 +75,16 @@ router.get('/:username',
   validateGitHubUsername,
   optionalAuth,
   UserController.getUserProfile
+);
+
+/**
+ * @route   POST /api/users/:username/sync
+ * @desc    Force sync user profile with live GitHub data
+ * @access  Public
+ */
+router.post('/:username/sync',
+  validateGitHubUsername,
+  UserController.syncUserProfile
 );
 
 /**
@@ -62,6 +102,7 @@ router.put('/:username',
 
 /**
  * @route   GET /api/users/:username/repositories
+ * @route   GET /api/users/:username/repos (alias)
  * @desc    Get user repositories
  * @access  Public
  */
@@ -69,6 +110,23 @@ router.get('/:username/repositories',
   validateGitHubUsername,
   optionalAuth,
   UserController.getUserRepositories
+);
+
+router.get('/:username/repos',
+  validateGitHubUsername,
+  optionalAuth,
+  UserController.getUserRepositories
+);
+
+/**
+ * @route   GET /api/users/:username/contributions
+ * @desc    Get user contribution calendar and stats
+ * @access  Public
+ */
+router.get('/:username/contributions',
+  validateGitHubUsername,
+  optionalAuth,
+  UserController.getUserContributions
 );
 
 /**

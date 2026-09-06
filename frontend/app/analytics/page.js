@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -24,13 +24,17 @@ import {
   RefreshCw, 
   Award, 
   CheckCircle2, 
-  ArrowUpRight,
-  Code2,
-  MapPin,
-  Swords
+  ArrowUpRight, 
+  Code2, 
+  MapPin, 
+  Swords,
+  ArrowLeftRight,
+  Share2,
+  Check
 } from 'lucide-react';
 
 function AnalyticsContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const rawCompare = searchParams?.get('compare') || searchParams?.get('users');
   const splitCompare = rawCompare ? rawCompare.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -41,6 +45,7 @@ function AnalyticsContent() {
   const [selectedDateRange, setSelectedDateRange] = useState('30d');
   const [compareUser1, setCompareUser1] = useState(initialU1);
   const [compareUser2, setCompareUser2] = useState(initialU2);
+  const [shareCopied, setShareCopied] = useState(false);
   
   const { analytics, loading: analyticsLoading, refetch } = useAnalytics({
     dateRange: selectedDateRange
@@ -70,8 +75,32 @@ function AnalyticsContent() {
 
   const handleRunComparison = (e) => {
     if (e) e.preventDefault();
-    if (!compareUser1.trim() || !compareUser2.trim()) return;
-    compareUsers([compareUser1.trim(), compareUser2.trim()]);
+    const u1 = compareUser1.trim();
+    const u2 = compareUser2.trim();
+    if (!u1 || !u2) return;
+    compareUsers([u1, u2]);
+    router.replace(`/analytics?u1=${encodeURIComponent(u1)}&u2=${encodeURIComponent(u2)}`);
+  };
+
+  const handleSwapUsers = () => {
+    const u1 = compareUser1.trim();
+    const u2 = compareUser2.trim();
+    if (!u1 || !u2) return;
+    setCompareUser1(u2);
+    setCompareUser2(u1);
+    compareUsers([u2, u1]);
+    router.replace(`/analytics?u1=${encodeURIComponent(u2)}&u2=${encodeURIComponent(u1)}`);
+  };
+
+  const handleShareDuel = () => {
+    if (typeof window !== 'undefined') {
+      const u1 = encodeURIComponent(compareUser1.trim());
+      const u2 = encodeURIComponent(compareUser2.trim());
+      const url = `${window.location.origin}/analytics?u1=${u1}&u2=${u2}`;
+      navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    }
   };
 
   const overview = analytics?.overview || {};
@@ -268,7 +297,18 @@ function AnalyticsContent() {
                   className="bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500"
                 />
               </div>
-              <span className="text-sm font-black text-indigo-400 px-2 uppercase tracking-wider">VS</span>
+
+              {/* 1-Click Combatant Swap Button */}
+              <button
+                type="button"
+                onClick={handleSwapUsers}
+                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-indigo-500/50 text-indigo-400 hover:text-white transition flex items-center justify-center gap-1 shrink-0 group cursor-pointer"
+                title="Swap Combatants (⇄)"
+              >
+                <ArrowLeftRight className="w-3.5 h-3.5 group-hover:rotate-180 transition-transform" />
+                <span className="text-xs font-black uppercase tracking-wider">VS</span>
+              </button>
+
               <div className="relative flex-1 w-full">
                 <Input
                   placeholder="Second GitHub username (e.g. sindresorhus)"
@@ -277,18 +317,41 @@ function AnalyticsContent() {
                   className="bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500"
                 />
               </div>
-              <Button 
-                type="submit" 
-                disabled={compareLoading}
-                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white font-medium shrink-0 shadow-lg shadow-indigo-500/20"
-              >
-                {compareLoading ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Scale className="w-4 h-4 mr-2" />
-                )}
-                Compare Developers
-              </Button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                <Button 
+                  type="submit" 
+                  disabled={compareLoading}
+                  className="flex-1 sm:flex-initial bg-indigo-600 hover:bg-indigo-500 text-white font-medium shadow-lg shadow-indigo-500/20"
+                >
+                  {compareLoading ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Scale className="w-4 h-4 mr-2" />
+                  )}
+                  Compare Developers
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleShareDuel}
+                  className="border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3"
+                  title="Copy shareable link to this comparison"
+                >
+                  {shareCopied ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-3.5 h-3.5 mr-1 text-indigo-400" />
+                      <span>Share</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </form>
           </CardHeader>
 

@@ -214,6 +214,32 @@ export default function UserProfile({ params }) {
   // Calendar Heatmap data
   const calendarDays = useMemo(() => user?.contributionCalendar || [], [user?.contributionCalendar]);
 
+  // Group calendarDays by Month for 12-Month Contribution Velocity Breakdown
+  const monthlyVelocity = useMemo(() => {
+    if (!calendarDays || calendarDays.length === 0) return [];
+    const monthMap = {};
+    calendarDays.forEach((day) => {
+      if (!day.date) return;
+      const d = new Date(day.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleDateString('en-US', { month: 'short' });
+      if (!monthMap[key]) {
+        monthMap[key] = { key, label, total: 0, daysActive: 0, year: d.getFullYear() };
+      }
+      const count = day.contributionCount || 0;
+      monthMap[key].total += count;
+      if (count > 0) monthMap[key].daysActive++;
+    });
+
+    const list = Object.values(monthMap).slice(-12);
+    const maxTotal = Math.max(...list.map(m => m.total), 1);
+    return list.map(m => ({
+      ...m,
+      pct: Math.round((m.total / maxTotal) * 100),
+      isMax: m.total === maxTotal && m.total > 0
+    }));
+  }, [calendarDays]);
+
   // Authentic streak computation (multi-year verified from github-streak engine)
   const streaks = useMemo(() => {
     const multiYearCurrent = multiYearStreak?.currentStreak;
@@ -1426,6 +1452,49 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
                     </div>
                   </div>
                 </div>
+
+                {/* 12-Month Contribution Velocity Bars */}
+                {monthlyVelocity.length > 0 && (
+                  <div className="pt-5 border-t border-slate-800/80">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Flame className="w-4 h-4 text-amber-400" />
+                        <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                          12-Month Contribution Velocity
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-slate-400">
+                        Peak Month: <strong className="text-emerald-400">{monthlyVelocity.find(m => m.isMax)?.label || ''}</strong> ({formatNumber(monthlyVelocity.find(m => m.isMax)?.total || 0)} contribs)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 pt-1 pb-2">
+                      {monthlyVelocity.map((m) => (
+                        <div key={m.key} className="flex flex-col items-center gap-1.5 group cursor-pointer">
+                          <span className="text-[10px] font-mono text-slate-400 font-semibold group-hover:text-emerald-400 transition-colors">
+                            {formatNumber(m.total)}
+                          </span>
+                          <div className="w-full bg-slate-950 h-20 rounded-lg p-1 flex items-end justify-center border border-slate-800/90 group-hover:border-slate-700 transition-colors">
+                            <div
+                              className={`w-full rounded-md transition-all duration-500 ${
+                                m.isMax 
+                                  ? 'bg-gradient-to-t from-emerald-500 to-emerald-400 shadow-sm shadow-emerald-500/40' 
+                                  : m.total > 0
+                                    ? 'bg-gradient-to-t from-blue-600 to-blue-400 group-hover:from-blue-500 group-hover:to-blue-300'
+                                    : 'bg-slate-800/50'
+                              }`}
+                              style={{ height: `${Math.max(6, m.pct)}%` }}
+                              title={`${m.label}: ${m.total} contributions across ${m.daysActive} active days`}
+                            />
+                          </div>
+                          <span className={`text-[11px] font-medium ${m.isMax ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
+                            {m.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Streak Metrics Highlights */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-slate-800">

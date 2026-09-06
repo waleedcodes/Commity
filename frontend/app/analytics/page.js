@@ -1,5 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -29,10 +30,17 @@ import {
   Swords
 } from 'lucide-react';
 
-export default function Analytics() {
+function AnalyticsContent() {
+  const searchParams = useSearchParams();
+  const rawCompare = searchParams?.get('compare') || searchParams?.get('users');
+  const splitCompare = rawCompare ? rawCompare.split(',').map(s => s.trim()).filter(Boolean) : [];
+  
+  const initialU1 = searchParams?.get('u1') || searchParams?.get('user1') || splitCompare[0] || 'torvalds';
+  const initialU2 = searchParams?.get('u2') || searchParams?.get('user2') || splitCompare[1] || 'sindresorhus';
+
   const [selectedDateRange, setSelectedDateRange] = useState('30d');
-  const [compareUser1, setCompareUser1] = useState('torvalds');
-  const [compareUser2, setCompareUser2] = useState('sindresorhus');
+  const [compareUser1, setCompareUser1] = useState(initialU1);
+  const [compareUser2, setCompareUser2] = useState(initialU2);
   
   const { analytics, loading: analyticsLoading, refetch } = useAnalytics({
     dateRange: selectedDateRange
@@ -44,10 +52,16 @@ export default function Analytics() {
     compareUsers 
   } = useCompareUsers();
 
-  // Run initial comparison between torvalds and sindresorhus
+  // Run initial comparison with dynamic URL params or defaults
   useEffect(() => {
-    compareUsers(['torvalds', 'sindresorhus']);
-  }, [compareUsers]);
+    if (initialU1 && initialU2) {
+      setCompareUser1(initialU1);
+      setCompareUser2(initialU2);
+      compareUsers([initialU1, initialU2]);
+    } else {
+      compareUsers(['torvalds', 'sindresorhus']);
+    }
+  }, [initialU1, initialU2, compareUsers]);
 
   const handleDateRangeChange = (range) => {
     setSelectedDateRange(range);
@@ -636,6 +650,21 @@ export default function Analytics() {
         </Card>
       </main>
     </div>
+  );
+}
+
+export default function Analytics() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center py-20">
+        <div className="text-center space-y-3">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
+          <p className="text-sm text-slate-400">Loading developer analytics...</p>
+        </div>
+      </div>
+    }>
+      <AnalyticsContent />
+    </Suspense>
   );
 }
 

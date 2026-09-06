@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -24,7 +25,9 @@ import {
   CheckCircle2,
   HelpCircle,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Download,
+  Swords
 } from 'lucide-react';
 
 const POPULAR_COUNTRIES = [
@@ -143,12 +146,26 @@ const LEADERBOARD_FAQS = [
 ];
 
 export default function Leaderboard() {
+  const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState('contributions');
   const [selectedTimeframe, setSelectedTimeframe] = useState('allTime');
   const [selectedLocation, setSelectedLocation] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedFaq, setExpandedFaq] = useState(0);
+  const [activeUserHandle, setActiveUserHandle] = useState('waleedcodes');
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('commity_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.username) setActiveUserHandle(parsed.username);
+      }
+    } catch {
+      // fallback
+    }
+  }, []);
 
   const { leaderboard, loading, refetch, pagination, regionSummary } = useLeaderboard({
     category: selectedCategory,
@@ -160,6 +177,54 @@ export default function Leaderboard() {
   });
   
   const { stats, loading: statsLoading, refetch: refetchStats } = useLeaderboardStats();
+
+  const handleLaunchDuel = (targetUsername, e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const challenger = activeUserHandle?.toLowerCase() === targetUsername?.toLowerCase() 
+      ? 'sufiyanshahiddev' 
+      : activeUserHandle;
+    router.push(`/analytics?u1=${challenger}&u2=${targetUsername}`);
+  };
+
+  const handleExportCSV = () => {
+    if (!filteredLeaderboard || filteredLeaderboard.length === 0) return;
+    const headers = ['Rank', 'Username', 'Name', 'Metric Category', 'Score', 'Followers', 'Public Repos', 'Location'];
+    const rows = filteredLeaderboard.map((u, i) => [
+      u.rank || i + 1,
+      u.username || u.login || '',
+      `"${(u.name || '').replace(/"/g, '""')}"`,
+      selectedCategory,
+      getMetricValue(u, selectedCategory),
+      u.followers || 0,
+      u.publicRepos || 0,
+      `"${(u.location || '').replace(/"/g, '""')}"`
+    ]);
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `commity_leaderboard_${selectedLocation}_${selectedCategory}_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportJSON = () => {
+    if (!filteredLeaderboard || filteredLeaderboard.length === 0) return;
+    const dataStr = JSON.stringify(filteredLeaderboard, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `commity_leaderboard_${selectedLocation}_${selectedCategory}_${Date.now()}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);
@@ -476,6 +541,18 @@ export default function Leaderboard() {
                         <p className="text-sm font-semibold text-slate-300">{formatNumber(top2.publicRepos || 0)}</p>
                       </div>
                     </div>
+
+                    <div className="mt-4 w-full">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleLaunchDuel(top2.username || top2.login, e)}
+                        className="w-full border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
+                      >
+                        <Swords className="w-3.5 h-3.5 text-indigo-400" />
+                        <span>⚔️ Challenge #2</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -522,6 +599,18 @@ export default function Leaderboard() {
                         <p className="text-sm font-semibold text-slate-200">{formatNumber(top1.publicRepos || 0)}</p>
                       </div>
                     </div>
+
+                    <div className="mt-4 w-full">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleLaunchDuel(top1.username || top1.login, e)}
+                        className="w-full border-amber-500/50 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10"
+                      >
+                        <Swords className="w-3.5 h-3.5 text-amber-400" />
+                        <span>⚔️ Challenge Champion in Duel</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -565,6 +654,18 @@ export default function Leaderboard() {
                         <p className="text-sm font-semibold text-slate-300">{formatNumber(top3.publicRepos || 0)}</p>
                       </div>
                     </div>
+
+                    <div className="mt-4 w-full">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => handleLaunchDuel(top3.username || top3.login, e)}
+                        className="w-full border-amber-800/60 bg-amber-900/30 hover:bg-amber-900/50 text-amber-200 text-xs font-semibold flex items-center justify-center gap-1.5"
+                      >
+                        <Swords className="w-3.5 h-3.5 text-amber-400" />
+                        <span>⚔️ Challenge #3</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -576,15 +677,41 @@ export default function Leaderboard() {
         <Card className="bg-slate-800/60 border-slate-700/80 backdrop-blur-sm">
           <CardContent className="p-6 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              {/* Search */}
-              <div className="relative w-full lg:max-w-md">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  placeholder="Search ranking by name or username..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-indigo-500"
-                />
+              {/* Search & Export Buttons */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:max-w-xl">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    placeholder="Search ranking by name or username..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-indigo-500"
+                  />
+                </div>
+
+                {/* Export Buttons */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportCSV}
+                    className="border-slate-700 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800 text-xs gap-1"
+                    title="Export current ranking table to CSV"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>CSV</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportJSON}
+                    className="border-slate-700 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800 text-xs gap-1"
+                    title="Export current ranking table to JSON"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-400" />
+                    <span>JSON</span>
+                  </Button>
+                </div>
               </div>
 
               {/* Timeframe Selector */}
@@ -795,6 +922,18 @@ export default function Leaderboard() {
                           <span><strong>{formatNumber(user.followers || 0)}</strong> followers</span>
                           <span><strong>{formatNumber(user.publicRepos || 0)}</strong> repos</span>
                         </div>
+
+                        {/* 1-Click Duel Action Button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => handleLaunchDuel(username, e)}
+                          className="h-8 px-2.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0"
+                          title={`Challenge @${username} to a head-to-head duel`}
+                        >
+                          <Swords className="w-3.5 h-3.5 text-indigo-400" />
+                          <span className="hidden sm:inline">Duel</span>
+                        </Button>
                       </div>
                     </Link>
                   );

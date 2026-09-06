@@ -714,16 +714,36 @@ class AnalyticsController {
       async () => {
         const dateRange = Helpers.getDateRange(period);
         
-        // Get all users
-        const users = await User.find({
-          username: { $in: usernames },
+        // Get all users (case-insensitive)
+        let users = await User.find({
+          username: { $in: usernames.map(u => new RegExp(`^${u}$`, 'i')) },
           isActive: true
         });
 
         if (users.length !== usernames.length) {
-          const foundUsernames = users.map(u => u.username);
-          const missingUsernames = usernames.filter(u => !foundUsernames.includes(u));
-          throw ErrorFactory.notFound(`Users not found: ${missingUsernames.join(', ')}`);
+          const foundLower = users.map(u => u.username.toLowerCase());
+          const missingUsernames = usernames.filter(u => !foundLower.includes(u.toLowerCase()));
+          
+          const UserService = require('../services/userService');
+          const userService = new UserService();
+          
+          for (const missingUser of missingUsernames) {
+            try {
+              logger.info(`🔍 Live syncing missing user for comparison: ${missingUser}`);
+              const synced = await userService.syncUserProfile(missingUser, false);
+              if (synced && synced.user) {
+                users.push(synced.user);
+              }
+            } catch (err) {
+              logger.warn(`Could not live sync missing user ${missingUser}: ${err.message}`);
+            }
+          }
+
+          if (users.length < 2) {
+            const stillFound = users.map(u => u.username.toLowerCase());
+            const stillMissing = usernames.filter(u => !stillFound.includes(u.toLowerCase()));
+            throw ErrorFactory.notFound(`Users not found on GitHub: ${stillMissing.join(', ')}`);
+          }
         }
 
         // Get analytics for all users in the period

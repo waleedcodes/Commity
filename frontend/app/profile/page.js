@@ -48,6 +48,8 @@ import { formatNumber, getLanguageColor } from '../utils/helpers';
 import { useLeaderboard, useLeaderboardStats } from '../hooks/useLeaderboard';
 import { useUsers } from '../hooks/useUsers';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+
 // Helper: Proportional comparative duel ratio
 const getRatio = (valA, valB) => {
   const a = Number(valA) || 0;
@@ -63,8 +65,9 @@ const getRatio = (valA, valB) => {
 };
 
 // Helper: 1-Click comparison markdown table for GitHub
-const generateComparisonMarkdown = (uA, uB) => {
+const generateComparisonMarkdown = (uA, uB, origin = '') => {
   if (!uA || !uB) return '';
+  const base = origin || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   const streakDiff = (uA.currentStreak || 0) - (uB.currentStreak || 0);
   const streakLeader = streakDiff > 0 ? `@${uA.username} (+${streakDiff}d)` : streakDiff < 0 ? `@${uB.username} (+${Math.abs(streakDiff)}d)` : 'Tied';
   
@@ -83,7 +86,7 @@ const generateComparisonMarkdown = (uA, uB) => {
   const repoLeader = repoDiff > 0 ? `@${uA.username}` : repoDiff < 0 ? `@${uB.username}` : 'Tied';
 
   return `### ⚡ Commity GitHub Developer Head-to-Head
-| Metric | [@${uA.username}](http://localhost:3000/profile/${uA.username}) | [@${uB.username}](http://localhost:3000/profile/${uB.username}) | Leader / Winner |
+| Metric | [@${uA.username}](${base}/profile/${uA.username}) | [@${uB.username}](${base}/profile/${uB.username}) | Leader / Winner |
 | :--- | :---: | :---: | :---: |
 | **Current Streak** | 🔥 ${formatNumber(uA.currentStreak)} Days | 🔥 ${formatNumber(uB.currentStreak)} Days | **${streakLeader}** |
 | **Longest Streak** | 🏆 ${formatNumber(uA.longestStreak)} Days | 🏆 ${formatNumber(uB.longestStreak)} Days | **${longestLeader}** |
@@ -94,7 +97,7 @@ const generateComparisonMarkdown = (uA, uB) => {
 | **Public Repositories** | 📁 ${uA.repos || 0} | 📁 ${uB.repos || 0} | **${repoLeader}** |
 | **Daily Velocity** | ⚡ ${uA.averagePerDay || 0} / day | ⚡ ${uB.averagePerDay || 0} / day | - |
 
-*Comparison generated live by [Commity](http://localhost:3000/profile)*`;
+*Comparison generated live by [Commity](${base}/profile)*`;
 };
 
 // Helper: Compute Category Verdict Champions
@@ -1434,7 +1437,8 @@ export default function ProfileHub() {
                       size="sm"
                       variant="outline"
                       onClick={() => {
-                        const md = `[![Commity Rank](${checkResult.badgeUrl})](http://localhost:3000/profile/${checkResult.username})`;
+                        const appBase = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+                        const md = `[![Commity Rank](${checkResult.badgeUrl})](${appBase}/profile/${checkResult.username})`;
                         navigator.clipboard.writeText(md);
                         setCopiedBadge(true);
                         setTimeout(() => setCopiedBadge(false), 2000);
@@ -1706,7 +1710,7 @@ export default function ProfileHub() {
                         <span className="text-[10px] font-mono text-blue-400 mb-1.5">@{compareDataA.username}</span>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={`http://localhost:5001/api/users/${compareDataA.username}/streak.svg?theme=${modalCompareTheme}`}
+                          src={`${API_BASE}/users/${compareDataA.username}/streak.svg?theme=${modalCompareTheme}`}
                           alt={`${compareDataA.username} streak`}
                           className="rounded-xl max-w-full h-auto shadow"
                         />
@@ -1715,7 +1719,7 @@ export default function ProfileHub() {
                         <span className="text-[10px] font-mono text-indigo-400 mb-1.5">@{compareDataB.username}</span>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={`http://localhost:5001/api/users/${compareDataB.username}/streak.svg?theme=${modalCompareTheme}`}
+                          src={`${API_BASE}/users/${compareDataB.username}/streak.svg?theme=${modalCompareTheme}`}
                           alt={`${compareDataB.username} streak`}
                           className="rounded-xl max-w-full h-auto shadow"
                         />

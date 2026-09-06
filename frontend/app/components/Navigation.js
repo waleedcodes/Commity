@@ -25,6 +25,10 @@ export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDark, setIsDark] = useState(false);
+  const [currentUser, setCurrentUser] = useState({
+    username: 'waleedcodes',
+    avatar: 'https://avatars.githubusercontent.com/u/110061477?v=4'
+  });
   const pathname = usePathname();
   const router = useRouter();
 
@@ -41,6 +45,39 @@ export default function Navigation() {
       document.documentElement.classList.remove('dark');
       setIsDark(false);
     }
+
+    // Load active profile from localStorage
+    try {
+      const savedUser = localStorage.getItem('commity_user');
+      if (savedUser) {
+        const parsed = JSON.parse(savedUser);
+        if (parsed?.username) {
+          setCurrentUser({
+            username: parsed.username,
+            avatar: parsed.avatar || `https://github.com/${parsed.username}.png`
+          });
+        } else if (typeof savedUser === 'string') {
+          setCurrentUser({
+            username: savedUser,
+            avatar: `https://github.com/${savedUser}.png`
+          });
+        }
+      }
+    } catch {
+      // fallback default
+    }
+
+    const handleUserChange = (e) => {
+      if (e.detail?.username) {
+        setCurrentUser({
+          username: e.detail.username,
+          avatar: e.detail.avatar || `https://github.com/${e.detail.username}.png`
+        });
+      }
+    };
+
+    window.addEventListener('commity_user_changed', handleUserChange);
+    return () => window.removeEventListener('commity_user_changed', handleUserChange);
   }, []);
 
   const toggleDarkMode = () => {
@@ -159,14 +196,16 @@ export default function Navigation() {
             </a>
 
             {/* User Profile Avatar */}
-            <Link href="/profile/waleedcodes">
+            <Link href={`/profile/${currentUser.username}`}>
               <Button variant="ghost" size="sm" className="h-9 px-2.5 rounded-lg flex items-center space-x-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800">
                 <Avatar className="h-6 w-6">
-                  <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="Waleed" />
-                  <AvatarFallback className="text-xs font-semibold">W</AvatarFallback>
+                  <AvatarImage src={currentUser.avatar} alt={currentUser.username} />
+                  <AvatarFallback className="text-xs font-semibold">
+                    {currentUser.username ? currentUser.username[0]?.toUpperCase() : 'U'}
+                  </AvatarFallback>
                 </Avatar>
                 <span className="hidden sm:inline text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  waleedcodes
+                  {currentUser.username}
                 </span>
               </Button>
             </Link>
@@ -223,6 +262,26 @@ export default function Navigation() {
                   </Link>
                 );
               })}
+
+              {/* Mobile Active User Link */}
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 mt-2">
+                <Link
+                  href={`/profile/${currentUser.username}`}
+                  className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={currentUser.avatar} alt={currentUser.username} />
+                    <AvatarFallback className="text-xs font-semibold">
+                      {currentUser.username ? currentUser.username[0]?.toUpperCase() : 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-xs leading-tight">My Profile</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">@{currentUser.username}</span>
+                  </div>
+                </Link>
+              </div>
             </div>
           </div>
         )}

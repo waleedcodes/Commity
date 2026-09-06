@@ -81,8 +81,9 @@ const getRatio = (valA, valB) => {
 };
 
 // Helper: 1-Click comparison markdown table for GitHub
-const generateComparisonMarkdown = (uA, uB) => {
+const generateComparisonMarkdown = (uA, uB, origin = '') => {
   if (!uA || !uB) return '';
+  const base = origin || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
   const streakDiff = (uA.currentStreak || 0) - (uB.currentStreak || 0);
   const streakLeader = streakDiff > 0 ? `@${uA.username} (+${streakDiff}d)` : streakDiff < 0 ? `@${uB.username} (+${Math.abs(streakDiff)}d)` : 'Tied';
   
@@ -101,7 +102,7 @@ const generateComparisonMarkdown = (uA, uB) => {
   const repoLeader = repoDiff > 0 ? `@${uA.username}` : repoDiff < 0 ? `@${uB.username}` : 'Tied';
 
   return `### ⚡ Commity GitHub Developer Head-to-Head
-| Metric | [@${uA.username}](http://localhost:3000/profile/${uA.username}) | [@${uB.username}](http://localhost:3000/profile/${uB.username}) | Leader / Winner |
+| Metric | [@${uA.username}](${base}/profile/${uA.username}) | [@${uB.username}](${base}/profile/${uB.username}) | Leader / Winner |
 | :--- | :---: | :---: | :---: |
 | **Current Streak** | 🔥 ${formatNumber(uA.currentStreak)} Days | 🔥 ${formatNumber(uB.currentStreak)} Days | **${streakLeader}** |
 | **Longest Streak** | 🏆 ${formatNumber(uA.longestStreak)} Days | 🏆 ${formatNumber(uB.longestStreak)} Days | **${longestLeader}** |
@@ -112,7 +113,7 @@ const generateComparisonMarkdown = (uA, uB) => {
 | **Public Repositories** | 📁 ${uA.repos || 0} | 📁 ${uB.repos || 0} | **${repoLeader}** |
 | **Daily Velocity** | ⚡ ${uA.averagePerDay || 0} / day | ⚡ ${uB.averagePerDay || 0} / day | - |
 
-*Comparison generated live by [Commity](http://localhost:3000/profile)*`;
+*Comparison generated live by [Commity](${base}/profile)*`;
 };
 
 // Helper: Compute Category Verdict Champions
@@ -339,9 +340,10 @@ export default function StreakStudio({ initialUser = 'waleedcodes', initialCompa
   };
 
   // README badge snippet
+  const appBase = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
   const svgBadgeUrl = `${API_BASE}/users/${activeUser}/streak.svg?theme=${selectedTheme}${hideBorder ? '&hide_border=true' : ''}`;
-  const markdownCode = `[![GitHub Streak](${svgBadgeUrl})](http://localhost:3000/profile/${activeUser})`;
-  const htmlCode = `<a href="http://localhost:3000/profile/${activeUser}"><img src="${svgBadgeUrl}" alt="GitHub Streak" /></a>`;
+  const markdownCode = `[![GitHub Streak](${svgBadgeUrl})](${appBase}/profile/${activeUser})`;
+  const htmlCode = `<a href="${appBase}/profile/${activeUser}"><img src="${svgBadgeUrl}" alt="GitHub Streak" /></a>`;
 
   const handleCopyCode = () => {
     const text = badgeFormat === 'markdown' ? markdownCode : htmlCode;

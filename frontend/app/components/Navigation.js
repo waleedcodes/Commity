@@ -19,12 +19,14 @@ import {
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/Avatar';
+import CommandPalette from './CommandPalette';
 import { cn } from "@/lib/utils";
 
 export default function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDark, setIsDark] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState({
     username: 'waleedcodes',
     avatar: 'https://avatars.githubusercontent.com/u/110061477?v=4'
@@ -155,19 +157,21 @@ export default function Navigation() {
 
           {/* Search and Actions */}
           <div className="flex items-center space-x-3">
-            {/* Quick Search Input */}
-            <form onSubmit={handleSearch} className="hidden lg:block">
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Search user..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-56 pl-9 pr-3 h-9 text-sm rounded-lg bg-slate-50 dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 focus-visible:ring-1"
-                />
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* Quick Spotlight Search Trigger with ⌘K Badge */}
+            <button
+              type="button"
+              onClick={() => setIsPaletteOpen(true)}
+              className="hidden lg:flex items-center justify-between w-60 h-9 px-3 text-sm rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition text-slate-400 dark:text-slate-400 group cursor-pointer"
+              title="Search developers, pages, and actions (⌘K)"
+            >
+              <div className="flex items-center space-x-2 truncate">
+                <Search className="w-4 h-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                <span className="text-xs text-slate-500 dark:text-slate-400">Search Commity...</span>
               </div>
-            </form>
+              <kbd className="inline-flex items-center gap-0.5 text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-300/80 dark:border-slate-600">
+                ⌘K
+              </kbd>
+            </button>
 
             {/* Dark Mode Toggle */}
             <Button 
@@ -226,19 +230,25 @@ export default function Navigation() {
         {/* Mobile Navigation Drawer */}
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-slate-200 dark:border-slate-800 space-y-3 animate-in slide-in-from-top-2">
-            {/* Mobile Search */}
-            <form onSubmit={handleSearch} className="px-1">
-              <div className="relative">
-                <Input
-                  type="text"
-                  placeholder="Search user (e.g. torvalds)..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 text-sm"
-                />
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              </div>
-            </form>
+            {/* Mobile Search & Spotlight */}
+            <div className="px-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  setIsPaletteOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm border border-slate-200 dark:border-slate-700"
+              >
+                <div className="flex items-center space-x-2">
+                  <Search className="w-4 h-4 text-slate-400" />
+                  <span>Search developers or pages...</span>
+                </div>
+                <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                  ⌘K
+                </kbd>
+              </button>
+            </div>
 
             {/* Mobile Menu Items */}
             <div className="space-y-1">
@@ -286,6 +296,13 @@ export default function Navigation() {
           </div>
         )}
       </div>
+
+      {/* Global Spotlight Command Palette */}
+      <CommandPalette 
+        isOpen={isPaletteOpen} 
+        onClose={(forceOpen) => setIsPaletteOpen(forceOpen === true)} 
+        onToggleDarkMode={toggleDarkMode} 
+      />
     </nav>
   );
 }

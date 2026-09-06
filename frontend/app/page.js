@@ -41,6 +41,8 @@ import { Badge } from './components/ui/Badge';
 import { apiService } from './services/api';
 import { formatNumber, getLanguageColor } from './utils/helpers';
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+
 // Featured popular developers with real verified handles
 const POPULAR_DEVELOPERS = [
   { username: 'sufiyanshahiddev', name: 'Sufiyan Shahid', role: 'PK Rank #1 Maintainer', country: 'Pakistan', flag: '🇵🇰', avatar: 'https://avatars.githubusercontent.com/u/224948898?v=4', lang: 'Python', contributions: 140654 },
@@ -102,6 +104,7 @@ const FAQS = [
 
 export default function Home() {
   const router = useRouter();
+  const appBase = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000');
 
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -232,7 +235,7 @@ export default function Home() {
   const handleCompare = (e) => {
     e.preventDefault();
     if (compareUser1.trim() && compareUser2.trim()) {
-      router.push(`/analytics?compare=${encodeURIComponent(compareUser1.trim())},${encodeURIComponent(compareUser2.trim())}`);
+      router.push(`/analytics?u1=${encodeURIComponent(compareUser1.trim())}&u2=${encodeURIComponent(compareUser2.trim())}`);
     }
   };
 
@@ -240,10 +243,10 @@ export default function Home() {
   const badgeMarkdown = useMemo(() => {
     const user = badgeUsername.trim() || 'waleedcodes';
     if (badgeType === 'svg') {
-      return `[![Commity Rank](http://localhost:5001/api/users/${user}/badge.svg)](http://localhost:3000/profile/${user})`;
+      return `[![Commity Rank](${API_BASE}/users/${user}/badge.svg)](${appBase}/profile/${user})`;
     }
-    return `[![Commity Rank](https://img.shields.io/badge/Commity-%231%20Rank-2563eb?style=for-the-badge&logo=github)](http://localhost:3000/profile/${user})`;
-  }, [badgeUsername, badgeType]);
+    return `[![Commity Rank](https://img.shields.io/badge/Commity-%231%20Rank-2563eb?style=for-the-badge&logo=github)](${appBase}/profile/${user})`;
+  }, [badgeUsername, badgeType, appBase]);
 
   const handleCopyBadge = () => {
     navigator.clipboard.writeText(badgeMarkdown);
@@ -905,7 +908,7 @@ export default function Home() {
                   <div className="inline-flex items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img 
-                      src={`http://localhost:5001/api/users/${badgeUsername.trim() || 'waleedcodes'}/badge.svg`}
+                      src={`${API_BASE}/users/${badgeUsername.trim() || 'waleedcodes'}/badge.svg`}
                       alt="Commity Rank Badge"
                       className="h-7 w-auto"
                       onError={(e) => {

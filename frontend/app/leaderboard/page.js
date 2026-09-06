@@ -138,7 +138,7 @@ const LEADERBOARD_FAQS = [
   },
   {
     q: "How do I embed my live Commity rank badge in my GitHub README?",
-    a: "Simply copy your badge markdown from the home page or your profile: [![Commity Rank](http://localhost:5001/api/users/YOUR_USERNAME/badge.svg)](http://localhost:3000/profile/YOUR_USERNAME) and paste it into your repository README.md!"
+    a: "Simply copy your live SVG badge markdown from your profile's 'README Badge' tab (e.g. [![Commity Rank](/api/users/USERNAME/badge.svg)](/profile/USERNAME)) and paste it directly into your GitHub repository README.md!"
   }
 ];
 

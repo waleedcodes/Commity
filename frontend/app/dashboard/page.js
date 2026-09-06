@@ -13,12 +13,10 @@ import {
   Globe, 
   RotateCw, 
   Flame,
-  CheckCircle2,
-  ExternalLink
+  CheckCircle2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/Avatar';
 import { apiService } from '../services/api';
 import { formatNumber, formatRelativeTime, getLanguageColor } from '../utils/helpers';
@@ -35,6 +33,27 @@ export default function Dashboard() {
   const [topLanguages, setTopLanguages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activityUser, setActivityUser] = useState('waleedcodes');
+  const [activityLoading, setActivityLoading] = useState(false);
+
+  // Fetch specific user's activity for live activity panel
+  const fetchUserActivity = useCallback(async (username) => {
+    setActivityLoading(true);
+    try {
+      const res = await apiService.get(`/users/${encodeURIComponent(username)}/activity`);
+      const actData = res?.data;
+      const eventsList = Array.isArray(actData) ? actData : (actData?.events || []);
+      if (eventsList.length > 0) {
+        setRecentActivity(eventsList.slice(0, 6));
+      } else {
+        setRecentActivity([]);
+      }
+    } catch (err) {
+      console.warn(`Could not load activity for ${username}:`, err.message);
+    } finally {
+      setActivityLoading(false);
+    }
+  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     setIsRefreshing(true);
@@ -44,7 +63,7 @@ export default function Dashboard() {
         apiService.get('/analytics/global'),
         apiService.get('/analytics/summary'),
         apiService.get('/leaderboard', { limit: 5, category: 'contributions' }),
-        apiService.get('/users/waleedcodes/activity')
+        apiService.get(`/users/${activityUser}/activity`)
       ]);
 
       // Set overview stats
@@ -99,11 +118,16 @@ export default function Dashboard() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [activityUser]);
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  const handleSwitchActivityUser = (u) => {
+    setActivityUser(u);
+    fetchUserActivity(u);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 py-8">
@@ -354,24 +378,48 @@ export default function Dashboard() {
             
             {/* Live Activity Feed */}
             <Card className="border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs">
-              <CardHeader className="flex flex-row items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center space-x-2.5">
-                  <div className="p-1.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
-                    <Activity className="w-4 h-4" />
+              <CardHeader className="flex flex-col gap-3 pb-4 border-b border-slate-100 dark:border-slate-800/80">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5">
+                    <div className="p-1.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
+                      <Activity className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-bold text-slate-900 dark:text-white">
+                        Live GitHub Events
+                      </CardTitle>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Real-time commits, pushes, and events
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-base font-bold text-slate-900 dark:text-white">
-                      Live GitHub Events
-                    </CardTitle>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Real-time commits, pushes, and repository events
-                    </p>
-                  </div>
+                  {activityLoading && (
+                    <RotateCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
+                  )}
+                </div>
+
+                {/* Contributor switcher pills */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] font-medium text-slate-400 mr-1">Developer:</span>
+                  {['waleedcodes', 'sufiyanshahiddev', 'torvalds', 'antfu'].map((u) => (
+                    <button
+                      key={u}
+                      type="button"
+                      onClick={() => handleSwitchActivityUser(u)}
+                      className={`text-[11px] px-2 py-0.5 rounded-full font-mono transition-colors ${
+                        activityUser === u
+                          ? 'bg-blue-600 text-white font-semibold shadow-xs'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                      @{u}
+                    </button>
+                  ))}
                 </div>
               </CardHeader>
 
               <CardContent className="p-4 space-y-3.5">
-                {isLoading ? (
+                {isLoading || activityLoading ? (
                   <div className="space-y-3">
                     {[...Array(4)].map((_, i) => (
                       <div key={i} className="flex items-start space-x-3 animate-pulse">

@@ -58,7 +58,7 @@ class Helpers {
     
     return input
       .trim()
-      .replace(/[<>\"'%;()&+]/g, '') // Remove potentially harmful characters
+      .replace(/[<>"'%;()&+]/g, '') // Remove potentially harmful characters
       .replace(/\s+/g, ' '); // Replace multiple spaces with single space
   }
   

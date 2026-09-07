@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] committersService.js
 const https = require('https');
 const User = require('../models/User');
 const logger = require('../utils/logger');

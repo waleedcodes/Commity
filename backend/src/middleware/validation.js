@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] validation.js
 const Joi = require('joi');
 const { ErrorFactory } = require('./errorHandler');
 const { REGEX, PAGINATION, ANALYTICS_PERIODS } = require('../config/constants');
@@ -213,3 +212,111 @@ const validateQuery = (schema) => {
 
 /**
  * Validate URL parameters
+ */
+const validateParams = (schema) => {
+  return (req, res, next) => {
+    const { error, value } = schema.validate(req.params, {
+      abortEarly: false,
+      allowUnknown: false,
+      stripUnknown: true,
+    });
+
+    if (error) {
+      const details = error.details.map(detail => ({
+        field: detail.path.join('.'),
+        message: detail.message,
+        value: detail.context.value,
+      }));
+
+      return next(ErrorFactory.badRequest('Parameter validation failed', { validationErrors: details }));
+    }
+
+    req.params = value;
+    next();
+  };
+};
+
+/**
+ * Custom validation functions
+ */
+
+// Validate GitHub username parameter
+const validateGitHubUsername = validateParams(Joi.object({
+  username: Joi.string()
+    .pattern(REGEX.GITHUB_USERNAME)
+    .min(1)
+    .max(39)
+    .required()
+    .messages({
+      'string.pattern.base': 'Invalid GitHub username format',
+    }),
+}));
+
+// Validate MongoDB ObjectId parameter
+const validateObjectId = (paramName = 'id') => {
+  return validateParams(Joi.object({
+    [paramName]: Joi.string().hex().length(24).required().messages({
+      'string.hex': 'Invalid ID format',
+      'string.length': 'Invalid ID format',
+    }),
+  }));
+};
+
+// Validate date range
+const validateDateRange = (req, res, next) => {
+  const { startDate, endDate } = req.query;
+  
+  if (startDate && endDate) {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    if (start > end) {
+      return next(ErrorFactory.badRequest('Start date must be before end date'));
+    }
+    
+    // Limit date range to prevent excessive queries
+    const maxRangeMs = 365 * 24 * 60 * 60 * 1000; // 1 year
+    if (end - start > maxRangeMs) {
+      return next(ErrorFactory.badRequest('Date range cannot exceed 1 year'));
+    }
+  }
+  
+  next();
+};
+
+/**
+ * Middleware exports with validation schemas
+ */
+module.exports = {
+  // Main validation functions
+  validate,
+  validateQuery,
+  validateParams,
+  
+  // Specific validators
+  validateGitHubUsername,
+  validateObjectId,
+  validateDateRange,
+  
+  // Validation schemas
+  schemas: {
+    githubUsername: githubUsernameSchema,
+    userProfileUpdate: userProfileUpdateSchema,
+    queryParams: queryParamsSchema,
+    analyticsQuery: analyticsQuerySchema,
+    leaderboardQuery: leaderboardQuerySchema,
+    repository: repositorySchema,
+    bulkUserUpdate: bulkUserUpdateSchema,
+    searchQuery: searchQuerySchema,
+    githubWebhook: githubWebhookSchema,
+  },
+  
+  // Pre-configured middleware
+  validateQueryParams: validateQuery(queryParamsSchema),
+  validateAnalyticsQuery: validateQuery(analyticsQuerySchema),
+  validateLeaderboardQuery: validateQuery(leaderboardQuerySchema),
+  validateSearchQuery: validateQuery(searchQuerySchema),
+  validateUserProfileUpdate: validate(userProfileUpdateSchema),
+  validateBulkUserUpdate: validate(bulkUserUpdateSchema),
+  validateGitHubWebhook: validate(githubWebhookSchema),
+};

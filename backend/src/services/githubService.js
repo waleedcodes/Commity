@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] githubService.js
 const { createGitHubClient, createGraphQLClient, GITHUB_CONFIG } = require('../config/github');
 const logger = require('../utils/logger');
 const CacheManager = require('../utils/cache');

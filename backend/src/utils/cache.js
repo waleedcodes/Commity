@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] cache.js
 const NodeCache = require('node-cache');
 const logger = require('./logger');
 const { CACHE_KEYS, TIME } = require('../config/constants');

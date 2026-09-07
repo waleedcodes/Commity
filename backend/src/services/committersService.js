@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] committersService.js
 const GitHubRankingService = require('./githubRankingService');
 const logger = require('../utils/logger');
 
@@ -25,3 +24,16 @@ class CommittersService {
       return {
         country: countryName,
         totalUsersInRegion: snapshot.totalUsersFound,
+        minFollowers: snapshot.minimumFollowers,
+        generatedAt: snapshot.generatedAt.toISOString(),
+        totalIndexed: snapshot.usersRanked,
+        dataSource: snapshot.dataSource,
+      };
+    } catch (error) {
+      logger.error(`[CommittersService] Error syncing region '${countryName}':`, error.message);
+      throw error;
+    }
+  }
+}
+
+module.exports = CommittersService;

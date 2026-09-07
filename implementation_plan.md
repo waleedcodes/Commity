@@ -77,3 +77,43 @@ graph TD
 #### [MODIFY] [syncWorker.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/services/syncWorker.js)
 - Call `GitHubRankingService.generateRegionalRanking('Pakistan')` during scheduled sync cycles.
 
+---
+
+### Phase 3: Backend API Expansion
+#### [MODIFY] [leaderboardController.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/controllers/leaderboardController.js)
+- Add `getFeaturedDevelopers`: Returns algorithmic top maintainers (top worldwide, top in key regions, top JavaScript/TypeScript/Python leaders).
+- Add `getRankingSnapshots`: Returns historical regional snapshots.
+- Add `getRegions`: Returns dynamic region metadata (active developer counts, top ranked quotas, flag emojis) aggregated live from MongoDB.
+
+#### [MODIFY] [analyticsController.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/controllers/analyticsController.js)
+- Enhance `getPlatformStats`: Return live verified numbers (`indexedDevelopers`, `indexedContributions`, `regionsCount`, `lastUpdatedAt`) computed from MongoDB.
+
+#### [MODIFY] [leaderboard.js routes](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/routes/leaderboard.js) & [analytics.js routes](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/routes/analytics.js)
+- Mount `GET /api/leaderboard/featured`
+- Mount `GET /api/leaderboard/snapshots`
+- Mount `GET /api/leaderboard/regions`
+- Mount `GET /api/platform/stats` (alias in analytics/app)
+
+---
+
+### Phase 4: Dynamic Frontend (Kill Hardcoded Data)
+#### [MODIFY] [page.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/frontend/app/page.js)
+- Replace static `POPULAR_DEVELOPERS` with live fetch from `/api/leaderboard/featured`.
+- Replace static `COUNTRY_TABS` counts and highlights with dynamic data from `/api/leaderboard/regions`.
+- Replace hardcoded hero numbers (`160,760+`, `100M+`, `12 users`) with live stats from `/api/platform/stats`.
+- Replace hardcoded `topThree` fallback with real podium data from `/api/leaderboard?limit=3`.
+- Add honest methodology tooltip/callout explaining the candidate discovery model.
+
+---
+
+## 3. Verification Plan
+
+### Automated Tests
+- Run `npm test` in `backend` to ensure all existing 14 tests pass and add unit tests for `GitHubRankingService`, `RankingSnapshot`, and new API endpoints.
+- Run `npm run lint` in `frontend` to verify 0 lint errors.
+
+### Live Functional Verification
+- Verify `/api/platform/stats` returns live database metrics.
+- Verify `/api/leaderboard/regions` returns dynamic region list.
+- Verify `/api/leaderboard/featured` returns live featured developers.
+- Verify frontend homepage loads dynamically with 0 hardcoded fallback numbers.

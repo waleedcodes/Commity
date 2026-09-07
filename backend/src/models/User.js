@@ -203,6 +203,26 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  accountType: {
+    type: String,
+    enum: ['User', 'Organization'],
+    default: 'User',
+    index: true,
+  },
+  contributionSource: {
+    type: String,
+    enum: ['github_graphql', 'github_rest', 'unverified'],
+    default: 'github_graphql',
+  },
+  dataQuality: {
+    type: String,
+    enum: ['verified', 'estimated', 'unverified'],
+    default: 'verified',
+  },
+  statsUpdatedAt: {
+    type: Date,
+    default: Date.now,
+  },
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -222,6 +242,7 @@ userSchema.index({ lastAnalyticsUpdate: 1 });
 userSchema.index({ isActive: 1, isVerified: 1 });
 
 // High performance compound indexes for scaling leaderboards & queries
+userSchema.index({ accountType: 1 });
 userSchema.index({ isActive: 1, totalContributions: -1 });
 userSchema.index({ isActive: 1, totalCommits: -1 });
 userSchema.index({ isActive: 1, followers: -1 });
@@ -230,6 +251,11 @@ userSchema.index({ isActive: 1, longestStreak: -1 });
 userSchema.index({ isActive: 1, location: 1, totalContributions: -1 });
 userSchema.index({ isActive: 1, 'topLanguages.name': 1, totalContributions: -1 });
 userSchema.index({ isActive: 1, lastAnalyticsUpdate: -1 });
+userSchema.index({ isActive: 1, accountType: 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, accountType: 1, totalCommits: -1 });
+userSchema.index({ isActive: 1, accountType: 1, followers: -1 });
+userSchema.index({ isActive: 1, accountType: 1, longestStreak: -1 });
+userSchema.index({ isActive: 1, accountType: 1, location: 1, totalContributions: -1 });
 
 // Virtual for GitHub login alias
 userSchema.virtual('login').get(function() {
@@ -266,15 +292,15 @@ userSchema.virtual('profileCompletion').get(function() {
 
 // Pre-save middleware
 userSchema.pre('save', function(next) {
-  // Always preserve true annual contribution count from GitHub GraphQL if provided,
-  // falling back to sum of components if not set or smaller
-  const calculatedSum = (this.totalCommits || 0) + 
-                        (this.totalPullRequests || 0) + 
-                        (this.totalIssues || 0) + 
-                        (this.totalReviews || 0);
-
-  if (!this.totalContributions || this.totalContributions < calculatedSum) {
-    this.totalContributions = calculatedSum;
+  // If totalContributions is not set or 0, compute from components as fallback
+  if (!this.totalContributions || this.totalContributions === 0) {
+    const calculatedSum = (this.totalCommits || 0) + 
+                          (this.totalPullRequests || 0) + 
+                          (this.totalIssues || 0) + 
+                          (this.totalReviews || 0);
+    if (calculatedSum > 0) {
+      this.totalContributions = calculatedSum;
+    }
   }
 
   // Update timestamps if analytics data changed
@@ -283,6 +309,7 @@ userSchema.pre('save', function(next) {
       this.isModified('totalContributions')) {
     this.lastFetchedAt = new Date();
     this.lastAnalyticsUpdate = new Date();
+    this.statsUpdatedAt = new Date();
   }
   
   next();
@@ -298,7 +325,7 @@ userSchema.statics.findByGitHubId = function(githubId) {
 };
 
 userSchema.statics.getLeaderboard = function(category = 'totalCommits', limit = 100, location = null) {
-  const query = { isActive: true };
+  const query = { isActive: true, accountType: { $ne: 'Organization' } };
   
   if (location) {
     query.location = new RegExp(location, 'i');
@@ -315,6 +342,7 @@ userSchema.methods.updateRank = async function(category = 'totalCommits') {
   const rank = await this.constructor.countDocuments({
     [category]: { $gt: this[category] },
     isActive: true,
+    accountType: { $ne: 'Organization' },
   }) + 1;
   
   this.globalRank = rank;

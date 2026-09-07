@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] api.test.js
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../src/index');

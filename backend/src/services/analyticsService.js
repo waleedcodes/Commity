@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] analyticsService.js
 const User = require('../models/User');
 const Analytics = require('../models/Analytics');
 const GitHubService = require('./githubService');

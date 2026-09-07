@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] analyticsService.js
 const User = require('../models/User');
 const Analytics = require('../models/Analytics');
 const GitHubService = require('./githubService');
@@ -401,3 +400,204 @@ class AnalyticsService {
               { 
                 $match: { 
                   isActive: true,
+                  location: { $exists: true, $ne: null, $ne: '' }
+                }
+              },
+              {
+                $group: {
+                  _id: '$location',
+                  userCount: { $sum: 1 },
+                  avgCommits: { $avg: '$totalCommits' }
+                }
+              },
+              { $sort: { userCount: -1 } },
+              { $limit: 15 }
+            ])
+          ]);
+
+          const contributionData = totalContributions[0] || {};
+          
+          return {
+            period: {
+              start: dateRange.start.toISOString(),
+              end: dateRange.end.toISOString(),
+              duration: period
+            },
+            users: {
+              total: totalUsers,
+              active: activeUsers,
+              newUsers: 0 // Would need additional query for user creation dates
+            },
+            contributions: {
+              commits: contributionData.totalCommits || 0,
+              pullRequests: contributionData.totalPullRequests || 0,
+              issues: contributionData.totalIssues || 0,
+              reviews: contributionData.totalReviews || 0,
+              total: (contributionData.totalCommits || 0) + 
+                     (contributionData.totalPullRequests || 0) + 
+                     (contributionData.totalIssues || 0) + 
+                     (contributionData.totalReviews || 0)
+            },
+            distributions: {
+              languages: languageDistribution.map(lang => ({
+                name: lang._id,
+                userCount: lang.userCount,
+                averageUsage: Math.round(lang.avgPercentage)
+              })),
+              locations: locationDistribution.map(loc => ({
+                name: loc._id,
+                userCount: loc.userCount,
+                averageCommits: Math.round(loc.avgCommits)
+              }))
+            }
+          };
+        },
+        30 * 60 // 30 minutes cache
+      );
+    } catch (error) {
+      logger.error(`Error getting platform stats:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Calculate user ranking
+   * @param {string} username - GitHub username
+   * @param {string} category - Ranking category
+   * @returns {Object} Ranking information
+   */
+  static async getUserRanking(username, category = 'commits') {
+    try {
+      const user = await User.findByUsername(username);
+      if (!user) {
+        throw new Error(`User ${username} not found`);
+      }
+
+      let field;
+      switch (category) {
+        case 'commits':
+          field = 'totalCommits';
+          break;
+        case 'followers':
+          field = 'followers';
+          break;
+        case 'repositories':
+          field = 'publicRepos';
+          break;
+        case 'contributions':
+          field = 'totalContributions';
+          break;
+        default:
+          field = 'totalCommits';
+      }
+
+      const [rank, totalUsers] = await Promise.all([
+        User.countDocuments({
+          [field]: { $gt: user[field] },
+          isActive: true
+        }),
+        User.countDocuments({ isActive: true })
+      ]);
+
+      const actualRank = rank + 1;
+      const percentile = Math.round((1 - (rank / totalUsers)) * 100);
+
+      return {
+        username: user.username,
+        category,
+        rank: actualRank,
+        totalUsers,
+        percentile,
+        value: user[field] || 0,
+        isTopPercent: percentile >= 90,
+        isTop100: actualRank <= 100,
+        isTop10: actualRank <= 10
+      };
+    } catch (error) {
+      logger.error(`Error getting user ranking for ${username}:`, error);
+      throw error;
+    }
+  }
+
+  // Private helper methods
+
+  /**
+   * Calculate streak information from analytics data
+   * @private
+   */
+  static _calculateStreak(analytics) {
+    if (!analytics || analytics.length === 0) {
+      return { current: 0, longest: 0 };
+    }
+
+    // Sort analytics by date
+    const sortedAnalytics = analytics
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+      .filter(record => record.commits > 0); // Only count days with commits
+
+    if (sortedAnalytics.length === 0) {
+      return { current: 0, longest: 0 };
+    }
+
+    let currentStreak = 0;
+    let longestStreak = 0;
+    let tempStreak = 1;
+    
+    const today = new Date();
+    const lastRecordDate = new Date(sortedAnalytics[sortedAnalytics.length - 1].date);
+    
+    // Check if the streak continues to today (within 1 day)
+    const daysDifference = Math.floor((today - lastRecordDate) / (1000 * 60 * 60 * 24));
+    if (daysDifference <= 1) {
+      currentStreak = 1;
+    }
+
+    // Calculate streaks
+    for (let i = sortedAnalytics.length - 2; i >= 0; i--) {
+      const currentDate = new Date(sortedAnalytics[i + 1].date);
+      const previousDate = new Date(sortedAnalytics[i].date);
+      const daysBetween = Math.floor((currentDate - previousDate) / (1000 * 60 * 60 * 24));
+      
+      if (daysBetween === 1) {
+        tempStreak++;
+        if (i === sortedAnalytics.length - 2 && daysDifference <= 1) {
+          currentStreak = tempStreak;
+        }
+      } else {
+        longestStreak = Math.max(longestStreak, tempStreak);
+        tempStreak = 1;
+      }
+    }
+    
+    longestStreak = Math.max(longestStreak, tempStreak);
+    
+    return {
+      current: currentStreak,
+      longest: longestStreak
+    };
+  }
+
+  /**
+   * Calculate user score for leaderboard
+   * @private
+   */
+  static _calculateUserScore(user) {
+    const weights = {
+      commits: 1,
+      pullRequests: 3,
+      issues: 2,
+      followers: 0.1,
+      repositories: 0.5
+    };
+
+    return Math.round(
+      (user.totalCommits || 0) * weights.commits +
+      (user.totalPullRequests || 0) * weights.pullRequests +
+      (user.totalIssues || 0) * weights.issues +
+      (user.followers || 0) * weights.followers +
+      (user.publicRepos || 0) * weights.repositories
+    );
+  }
+}
+
+module.exports = AnalyticsService;

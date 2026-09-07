@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] analyticsController.js
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ErrorFactory } = require('../middleware/errorHandler');
 const User = require('../models/User');

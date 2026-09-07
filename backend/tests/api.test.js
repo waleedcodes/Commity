@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] api.test.js
 const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../src/index');
@@ -258,3 +257,133 @@ describe('API Routes', () => {
       const content = response.text || (response.body && response.body.toString()) || '';
       expect(content).toContain('<svg');
     });
+  });
+
+  describe('Leaderboard API', () => {
+    test('GET /api/leaderboard should return leaderboard data', async () => {
+      const response = await request(app)
+        .get('/api/leaderboard')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('category');
+      expect(response.body.data).toHaveProperty('period');
+    });
+
+    test('GET /api/leaderboard?category=public_contributions should accept public_contributions category', async () => {
+      const response = await request(app)
+        .get('/api/leaderboard?category=public_contributions')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('category', 'public_contributions');
+    });
+
+    test('GET /api/leaderboard/stats should return statistics', async () => {
+      const response = await request(app)
+        .get('/api/leaderboard/stats')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('totalUsers');
+      expect(response.body.data).toHaveProperty('totalContributions');
+    });
+
+    test('GET /api/leaderboard/featured should return algorithmic featured developers', async () => {
+      const response = await request(app)
+        .get('/api/leaderboard/featured')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('worldwide');
+      expect(response.body.data).toHaveProperty('pakistan');
+      expect(response.body.data).toHaveProperty('languages');
+    });
+
+    test('GET /api/leaderboard/regions should return dynamic regions list', async () => {
+      const response = await request(app)
+        .get('/api/leaderboard/regions')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThan(0);
+      expect(response.body.data[0]).toHaveProperty('name');
+    });
+
+    test('GET /api/leaderboard/snapshots should return regional snapshots', async () => {
+      const response = await request(app)
+        .get('/api/leaderboard/snapshots?region=pakistan')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body).toHaveProperty('data');
+    });
+  });
+
+  describe('Platform Stats API', () => {
+    test('GET /api/platform/stats should return live dynamic platform stats', async () => {
+      const response = await request(app)
+        .get('/api/platform/stats')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('indexedDevelopers');
+      expect(response.body.data).toHaveProperty('totalContributions');
+      expect(response.body.data).toHaveProperty('cadence', '7-Day Weekly Snapshots');
+    });
+  });
+
+  describe('Analytics API', () => {
+    test('GET /api/analytics should return analytics data', async () => {
+      const response = await request(app)
+        .get('/api/analytics')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('period');
+    });
+
+    test('GET /api/analytics/summary should return summary', async () => {
+      const response = await request(app)
+        .get('/api/analytics/summary')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+    });
+
+    test('POST /api/analytics/compare should return multi-user comparison', async () => {
+      const response = await request(app)
+        .post('/api/analytics/compare')
+        .send({
+          usernames: ['octocat', 'torvalds'],
+          period: '30d'
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('users');
+      expect(Array.isArray(response.body.data.users)).toBe(true);
+    });
+  });
+});
+
+describe('Error Handling', () => {
+  test('GET /non-existent-route should return 404', async () => {
+    const response = await request(app)
+      .get('/non-existent-route')
+      .expect(404);
+
+    expect(response.body).toHaveProperty('error');
+    expect(response.body.error).toHaveProperty('message');
+  });
+
+  test('Invalid GitHub username should return 400', async () => {
+    const response = await request(app)
+      .get('/api/users/invalid@username')
+      .expect(400);
+
+    expect(response.body).toHaveProperty('success', false);
+    expect(response.body.error).toHaveProperty('type', 'ValidationError');
+  });
+});

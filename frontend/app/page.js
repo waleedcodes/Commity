@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] page.js
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';

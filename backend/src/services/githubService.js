@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] githubService.js
+// [Commity Core Phase 2: Logic] githubService.js
 const { createGitHubClient, createGraphQLClient, GITHUB_CONFIG } = require('../config/github');
 const logger = require('../utils/logger');
 const CacheManager = require('../utils/cache');
@@ -33,6 +33,8 @@ class GitHubService {
           const profile = {
             githubId: data.id,
             username: data.login,
+            type: data.type || 'User',
+            accountType: data.type || 'User',
             name: data.name,
             email: data.email,
             bio: data.bio,
@@ -305,16 +307,34 @@ class GitHubService {
           return contributionsData;
         } catch (error) {
           if (error.message && error.message.includes('Could not resolve to a User')) {
-            throw ErrorFactory.notFound(`GitHub user '${username}' not found`);
+            logger.info(`GitHub login '${username}' is not a User account (likely an Organization). Returning zeroed contribution metrics.`);
+            return {
+              totalContributions: 0,
+              publicContributions: 0,
+              privateContributions: 0,
+              totalCommits: 0,
+              totalIssues: 0,
+              totalPullRequests: 0,
+              totalReviews: 0,
+              totalRepositories: 0,
+              contributionStreak: 0,
+              longestStreak: 0,
+              contributionCalendar: [],
+              topRepositories: [],
+            };
           }
           logger.warn(`GraphQL contributions fetch failed for ${username}, falling back to defaults: ${error.message}`);
           return {
             totalContributions: 0,
+            publicContributions: 0,
+            privateContributions: 0,
             totalCommits: 0,
             totalIssues: 0,
             totalPullRequests: 0,
             totalReviews: 0,
             totalRepositories: 0,
+            contributionStreak: 0,
+            longestStreak: 0,
             contributionCalendar: [],
             topRepositories: [],
           };
@@ -342,176 +362,3 @@ class GitHubService {
           const repositories = await this.getUserRepositories(username, { type: 'owner' });
           const languageStats = {};
           let totalBytes = 0;
-
-          // Fetch top 12 repositories concurrently to optimize speed and stay within rate limits
-          const topRepos = (repositories || []).slice(0, 12);
-          const langResults = await Promise.all(
-            topRepos.map(repo => 
-              this.octokit.rest.repos.listLanguages({
-                owner: username,
-                repo: repo.name,
-              }).then(res => res.data).catch(() => ({}))
-            )
-          );
-
-          for (const languages of langResults) {
-            Object.entries(languages).forEach(([language, bytes]) => {
-              languageStats[language] = (languageStats[language] || 0) + bytes;
-              totalBytes += bytes;
-            });
-          }
-
-          // Convert to percentage-based statistics
-          const languageArray = Object.entries(languageStats)
-            .map(([name, bytes]) => ({
-              name,
-              bytes,
-              percentage: Helpers.calculatePercentage(bytes, totalBytes),
-              color: this._getLanguageColor(name),
-            }))
-            .sort((a, b) => b.bytes - a.bytes);
-
-          logger.info(`Successfully calculated language statistics for: ${username}`);
-          return languageArray;
-        } catch (error) {
-          throw ErrorFactory.githubAPI(`Failed to fetch language statistics: ${error.message}`);
-        }
-      },
-      30 * 60 // 30 minutes cache
-    );
-  }
-
-  /**
-   * Search users on GitHub
-   * @param {string} query - Search query
-   * @param {object} options - Search options
-   * @returns {Promise<object>} Search results
-   */
-  async searchUsers(query, options = {}) {
-    try {
-      logger.info(`Searching GitHub users: ${query}`);
-      
-      const params = {
-        q: query,
-        sort: options.sort || 'followers',
-        order: options.order || 'desc',
-        per_page: options.per_page || 30,
-        page: options.page || 1,
-      };
-
-      const { data } = await this.octokit.rest.search.users(params);
-
-      const results = {
-        totalCount: data.total_count,
-        incompleteResults: data.incomplete_results,
-        users: data.items.map(user => ({
-          githubId: user.id,
-          username: user.login,
-          avatarUrl: user.avatar_url,
-          htmlUrl: user.html_url,
-          type: user.type,
-          score: user.score,
-        })),
-      };
-
-      logger.info(`Found ${results.totalCount} users for query: ${query}`);
-      return results;
-    } catch (error) {
-      throw ErrorFactory.githubAPI(`Search failed: ${error.message}`, error.status);
-    }
-  }
-
-  /**
-   * Get GitHub rate limit status
-   * @returns {Promise<object>} Rate limit information
-   */
-  async getRateLimit() {
-    const cacheKey = 'github_rate_limit';
-    
-    return await CacheManager.getOrSet(
-      CACHE_KEYS.RATE_LIMIT,
-      cacheKey,
-      async () => {
-        try {
-          const { data } = await this.octokit.rest.rateLimit.get();
-          return data.rate;
-        } catch (error) {
-          throw ErrorFactory.githubAPI(`Failed to get rate limit: ${error.message}`);
-        }
-      },
-      60 // 1 minute cache
-    );
-  }
-
-  /**
-   * Process event payload based on event type
-   * @private
-   */
-  _processEventPayload(eventType, payload) {
-    switch (eventType) {
-      case 'PushEvent':
-        return {
-          ref: payload.ref,
-          size: payload.size,
-          commits: payload.commits?.length || 0,
-        };
-      case 'PullRequestEvent':
-        return {
-          action: payload.action,
-          number: payload.number,
-          title: payload.pull_request?.title,
-        };
-      case 'IssuesEvent':
-        return {
-          action: payload.action,
-          number: payload.issue?.number,
-          title: payload.issue?.title,
-        };
-      case 'CreateEvent':
-        return {
-          refType: payload.ref_type,
-          ref: payload.ref,
-        };
-      case 'ForkEvent':
-        return {
-          forkee: payload.forkee?.full_name,
-        };
-      default:
-        return payload;
-    }
-  }
-
-  /**
-   * Get language color (simplified mapping)
-   * @private
-   */
-  _getLanguageColor(language) {
-    const colors = {
-      JavaScript: '#f1e05a',
-      TypeScript: '#2b7489',
-      Python: '#3572A5',
-      Java: '#b07219',
-      'C++': '#f34b7d',
-      C: '#555555',
-      'C#': '#239120',
-      PHP: '#4F5D95',
-      Ruby: '#701516',
-      Go: '#00ADD8',
-      Rust: '#dea584',
-      Swift: '#ffac45',
-      Kotlin: '#F18E33',
-      Scala: '#c22d40',
-      R: '#198CE7',
-      MATLAB: '#e16737',
-      Shell: '#89e051',
-      HTML: '#e34c26',
-      CSS: '#1572B6',
-      Vue: '#2c3e50',
-      React: '#61dafb',
-    };
-    
-    return colors[language] || Helpers.generateColorFromString(language);
-  }
-}
-
-module.exports = GitHubService;

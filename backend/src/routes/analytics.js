@@ -46,6 +46,16 @@ router.get('/summary',
 );
 
 /**
+ * @route   GET /api/analytics/platform/stats
+ * @route   GET /api/platform/stats
+ * @desc    Get live platform statistics
+ * @access  Public
+ */
+router.get('/platform/stats',
+  AnalyticsController.getPlatformStats
+);
+
+/**
  * @route   GET /api/analytics/insights
  * @desc    Get platform insights and comprehensive analytics
  * @access  Public

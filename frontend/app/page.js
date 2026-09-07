@@ -90,7 +90,7 @@ const FAQS = [
   },
   {
     q: 'How do country and regional leaderboards work?',
-    a: 'Commity indexes contributor profile locations (e.g. Pakistan, United States, Japan) and enables instant country-level rankings. For example, selecting Pakistan indexes the top 256 maintainers from over 160,760 developers in the region, including Sufiyan Shahid (#1 in Pakistan) and @waleedcodes (#38 in Pakistan with 4,225+ contributions).'
+    a: 'Commity adopts the committers.top engineering model. Candidate developers located in a region (e.g. Pakistan, United States, Japan) are discovered via GitHub Search by follower cohort, and Commity fetches each candidate’s exact 365-day contributions collection via GitHub GraphQL API. Candidates are then sorted by genuine total contributions (commits, pull requests, issues, and code reviews) to produce authoritative regional rankings of the top 256 developers.'
   },
   {
     q: 'Can I force an on-demand refresh for my own profile?',
@@ -109,14 +109,24 @@ export default function Home() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Platform statistics
+  // Platform statistics (dynamically updated from /api/platform/stats)
   const [stats, setStats] = useState({
-    totalUsers: 12,
+    totalUsers: 256,
+    indexedDevelopers: 256,
     totalRepositories: 3375,
-    totalContributions: 67710,
-    totalContributors: 12,
+    totalContributions: 958611,
+    totalContributors: 256,
     totalFollowers: 767641,
+    regionsCount: 10,
+    cadence: '7-Day Weekly Snapshots',
+    dataSource: 'GitHub GraphQL API (Direct Verified)'
   });
+
+  // Featured Developers (dynamically populated from /api/leaderboard/featured)
+  const [featuredDevs, setFeaturedDevs] = useState(POPULAR_DEVELOPERS);
+
+  // Regional Leaderboard Tabs (dynamically populated from /api/leaderboard/regions)
+  const [regions, setRegions] = useState(COUNTRY_TABS);
 
   // Top 3 Podium Contributors
   const [topThree, setTopThree] = useState([
@@ -129,6 +139,11 @@ export default function Home() {
   const [activeCountry, setActiveCountry] = useState('all');
   const [countryUsers, setCountryUsers] = useState([]);
   const [isCountryLoading, setIsCountryLoading] = useState(false);
+
+  // Current active region helper
+  const currentRegion = useMemo(() => {
+    return regions.find((t) => t.id === activeCountry) || regions[0] || { id: 'all', name: 'Worldwide', flag: '🌍', query: '' };
+  }, [regions, activeCountry]);
 
   // Compare Duel State
   const [compareUser1, setCompareUser1] = useState('waleedcodes');
@@ -145,26 +160,97 @@ export default function Home() {
   // Loading state
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch initial summary & global top 3
+  // Fetch initial summary & dynamic data
   useEffect(() => {
     const fetchHomeData = async () => {
       try {
-        const [summaryRes, lbRes] = await Promise.allSettled([
-          apiService.get('/analytics/summary'),
+        const [statsRes, featuredRes, regionsRes, lbRes] = await Promise.allSettled([
+          apiService.get('/platform/stats'),
+          apiService.get('/leaderboard/featured'),
+          apiService.get('/leaderboard/regions'),
           apiService.get('/leaderboard', { limit: 3, category: 'contributions' }),
         ]);
 
-        if (summaryRes.status === 'fulfilled' && summaryRes.value?.data) {
-          const sum = summaryRes.value.data;
+        if (statsRes.status === 'fulfilled' && statsRes.value?.data) {
+          const s = statsRes.value.data;
           setStats((prev) => ({
             ...prev,
-            totalUsers: sum.totalUsers || prev.totalUsers,
-            totalRepositories: sum.totalRepositories || prev.totalRepositories,
-            totalContributions: sum.totalContributions || sum.totalCommits || prev.totalContributions,
-            totalContributors: sum.totalContributors || prev.totalContributors,
+            totalUsers: s.totalUsers || s.indexedDevelopers || prev.totalUsers,
+            indexedDevelopers: s.indexedDevelopers || s.totalUsers || prev.indexedDevelopers,
+            totalRepositories: s.totalRepositories || prev.totalRepositories,
+            totalContributions: s.totalContributions || s.indexedContributions || prev.totalContributions,
+            totalFollowers: s.totalFollowers || prev.totalFollowers,
+            regionsCount: s.regionsCount || prev.regionsCount,
+            lastUpdatedAt: s.lastUpdatedAt || prev.lastUpdatedAt,
+            cadence: s.cadence || prev.cadence,
+            dataSource: s.dataSource || prev.dataSource,
           }));
+        } else {
+          // Fallback to /analytics/summary if /platform/stats is unreachable
+          try {
+            const summaryRes = await apiService.get('/analytics/summary');
+            if (summaryRes?.data) {
+              const sum = summaryRes.data;
+              setStats((prev) => ({
+                ...prev,
+                totalUsers: sum.totalUsers || prev.totalUsers,
+                totalRepositories: sum.totalRepositories || prev.totalRepositories,
+                totalContributions: sum.totalContributions || sum.totalCommits || prev.totalContributions,
+                totalContributors: sum.totalContributors || prev.totalContributors,
+              }));
+            }
+          } catch (e) {
+            // Ignore fallback error
+          }
         }
 
+        // Process algorithmic featured developers
+        if (featuredRes.status === 'fulfilled' && featuredRes.value?.data) {
+          const feat = featuredRes.value.data;
+          const combined = [];
+          const seen = new Set();
+
+          const addDevs = (list, rolePrefix = '') => {
+            if (!Array.isArray(list)) return;
+            list.forEach((u) => {
+              const uname = u.username || u.login;
+              if (!uname || seen.has(uname)) return;
+              seen.add(uname);
+              combined.push({
+                username: uname,
+                name: u.name || uname,
+                role: rolePrefix || (u.location ? `${u.location} Maintainer` : 'Core Contributor'),
+                country: u.location || 'Worldwide',
+                flag: u.location && u.location.toLowerCase().includes('pakistan') ? '🇵🇰' : '🌍',
+                avatar: u.avatarUrl || `https://avatars.githubusercontent.com/${uname}?v=4`,
+                lang: u.topLanguages?.[0]?.name || 'TypeScript',
+                contributions: u.totalContributions || u.totalCommits || 0,
+              });
+            });
+          };
+
+          addDevs(feat.pakistan, '🇵🇰 Pakistan Maintainer');
+          addDevs(feat.worldwide, '🌍 Top Worldwide Contributor');
+          if (feat.languages) {
+            Object.entries(feat.languages).forEach(([lang, list]) => {
+              addDevs(list, `${lang.toUpperCase()} Specialist`);
+            });
+          }
+
+          if (combined.length > 0) {
+            setFeaturedDevs(combined);
+          }
+        }
+
+        // Process dynamic region list
+        if (regionsRes.status === 'fulfilled' && Array.isArray(regionsRes.value?.data)) {
+          const regList = regionsRes.value.data;
+          if (regList.length > 0) {
+            setRegions(regList);
+          }
+        }
+
+        // Process top 3 podium
         if (lbRes.status === 'fulfilled') {
           const lb = lbRes.value?.data;
           const list = Array.isArray(lb) ? lb : (lb?.users || []);
@@ -195,7 +281,7 @@ export default function Home() {
   // Fetch Country specific leaderboard when tab changes
   useEffect(() => {
     const fetchCountryData = async () => {
-      const selected = COUNTRY_TABS.find(t => t.id === activeCountry);
+      const selected = regions.find((t) => t.id === activeCountry);
       if (!selected || !selected.query) {
         setCountryUsers([]);
         return;
@@ -221,7 +307,7 @@ export default function Home() {
     if (activeCountry !== 'all') {
       fetchCountryData();
     }
-  }, [activeCountry]);
+  }, [activeCountry, regions]);
 
   // Handle Search Submission
   const handleSearch = (e) => {
@@ -281,9 +367,11 @@ export default function Home() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-slate-200">160,760+ Developers in Pakistan 🇵🇰</span>
+            <span className="text-slate-200">
+              {stats.totalUsers ? `${formatNumber(stats.totalUsers)}+` : '256+'} Verified Engineers 🇵🇰
+            </span>
             <span className="text-slate-500">•</span>
-            <span className="text-slate-300">100M+ Worldwide</span>
+            <span className="text-slate-300">{stats.regionsCount || 10}+ Global Regions</span>
             <span className="text-slate-500">•</span>
             <span className="text-blue-400 font-medium lowercase">7-day weekly snapshots</span>
           </div>
@@ -331,7 +419,7 @@ export default function Home() {
               Explore Featured Open-Source Leaders
             </p>
             <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
-              {POPULAR_DEVELOPERS.map((dev) => (
+              {featuredDevs.map((dev) => (
                 <Link
                   key={dev.username}
                   href={`/profile/${dev.username}`}
@@ -380,20 +468,20 @@ export default function Home() {
         <section className="py-6">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             
-            {/* Metric 1: Pakistan Community */}
+            {/* Metric 1: Verified Engineers Indexed */}
             <Card className="bg-slate-900/60 border-slate-800/80 backdrop-blur-md hover:border-slate-700 transition-all">
               <CardContent className="p-5 sm:p-6 flex items-center space-x-4">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                  <span className="text-xl">🇵🇰</span>
+                  <Users className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pakistan Devs</p>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Indexed Engineers</p>
                   <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">
-                    160,760
+                    {isLoading ? '...' : formatNumber(stats.totalUsers || stats.indexedDevelopers || 256)}
                   </h3>
                   <p className="text-[10px] text-emerald-400 flex items-center gap-1 mt-0.5">
                     <CheckCircle className="w-3 h-3" />
-                    <span>Active on GitHub</span>
+                    <span>GraphQL Verified Profiles</span>
                   </p>
                 </div>
               </CardContent>
@@ -406,13 +494,13 @@ export default function Home() {
                   <Globe className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Global Developers</p>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Global Coverage</p>
                   <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">
-                    100M+
+                    {stats.regionsCount || 10}+ Regions
                   </h3>
                   <p className="text-[10px] text-blue-400 flex items-center gap-1 mt-0.5">
                     <Zap className="w-3 h-3" />
-                    <span>Worldwide Network</span>
+                    <span>Candidate Discovery</span>
                   </p>
                 </div>
               </CardContent>
@@ -427,7 +515,7 @@ export default function Home() {
                 <div>
                   <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Annual Contributions</p>
                   <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">
-                    {isLoading ? '...' : formatNumber(stats.totalContributions || 958611)}+
+                    {isLoading ? '...' : formatNumber(stats.totalContributions || 0)}+
                   </h3>
                   <p className="text-[10px] text-purple-400 flex items-center gap-1 mt-0.5">
                     <Flame className="w-3 h-3" />
@@ -437,20 +525,20 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            {/* Metric 4: Verified Maintainers */}
+            {/* Metric 4: Ranked Cohort */}
             <Card className="bg-slate-900/60 border-slate-800/80 backdrop-blur-md hover:border-slate-700 transition-all">
               <CardContent className="p-5 sm:p-6 flex items-center space-x-4">
                 <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-                  <Users className="w-6 h-6" />
+                  <Trophy className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Ranked Maintainers</p>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Regional Snapshots</p>
                   <h3 className="text-2xl font-black text-white mt-0.5 tracking-tight">
                     Top 256
                   </h3>
                   <p className="text-[10px] text-amber-400 flex items-center gap-1 mt-0.5">
-                    <CheckCircle className="w-3 h-3" />
-                    <span>Min 69 Followers Cohort</span>
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>committers.top Architecture</span>
                   </p>
                 </div>
               </CardContent>
@@ -669,17 +757,17 @@ export default function Home() {
             </div>
 
             <Link 
-              href={`/leaderboard${activeCountry !== 'all' ? `?location=${COUNTRY_TABS.find(t=>t.id===activeCountry)?.query}` : ''}`}
+              href={`/leaderboard${activeCountry !== 'all' ? `?location=${currentRegion.query || ''}` : ''}`}
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-400 hover:text-blue-300"
             >
-              <span>View Full {COUNTRY_TABS.find(t=>t.id===activeCountry)?.name} Table</span>
+              <span>View Full {currentRegion.name} Table</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           {/* Country Tabs */}
           <div className="flex flex-wrap gap-2 mb-6">
-            {COUNTRY_TABS.map((tab) => {
+            {regions.map((tab) => {
               const isActive = activeCountry === tab.id;
               return (
                 <button
@@ -693,6 +781,11 @@ export default function Home() {
                 >
                   <span className="text-sm">{tab.flag}</span>
                   <span>{tab.name}</span>
+                  {tab.indexedMaintainers > 0 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                      {tab.indexedMaintainers}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -752,22 +845,22 @@ export default function Home() {
             ) : isCountryLoading ? (
               <div className="py-12 text-center text-slate-400 text-xs flex flex-col items-center gap-2">
                 <RefreshCw className="w-5 h-5 animate-spin text-blue-400" />
-                <span>Fetching {COUNTRY_TABS.find(t=>t.id===activeCountry)?.name} rankings...</span>
+                <span>Fetching {currentRegion.name} rankings...</span>
               </div>
             ) : countryUsers.length > 0 ? (
               <div className="space-y-3">
                 {/* Country scale indicator banner */}
                 <div className="p-3.5 rounded-xl bg-slate-800/70 border border-slate-700/70 flex items-center justify-between gap-3 text-xs mb-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="text-xl">{COUNTRY_TABS.find(t=>t.id===activeCountry)?.flag}</span>
+                    <span className="text-xl">{currentRegion.flag || '🌍'}</span>
                     <span className="text-slate-300 leading-relaxed">
-                      {activeCountry === 'Pakistan' 
-                        ? '160,760 active GitHub developers in Pakistan. Indexing top maintainers nationwide (committers.top model, min 69 followers required).'
-                        : `Showing top ranked contributors in ${COUNTRY_TABS.find(t=>t.id===activeCountry)?.name} with verified full-year GraphQL contributions.`}
+                      {currentRegion.totalUsersFound 
+                        ? `${formatNumber(currentRegion.totalUsersFound)}+ active developers in ${currentRegion.name}. Candidates discovered by follower cohort (min ${currentRegion.minimumFollowers || 10} followers), verified & ranked by genuine 365-day GraphQL total contributions.`
+                        : `Verified open-source contributors in ${currentRegion.name} ranked by true 365-day GraphQL contributions (commits, pull requests, and reviews).`}
                     </span>
                   </div>
                   <Link 
-                    href={`/leaderboard?location=${COUNTRY_TABS.find(t=>t.id===activeCountry)?.query}`}
+                    href={`/leaderboard?location=${currentRegion.query || ''}`}
                     className="text-blue-400 hover:text-blue-300 font-semibold shrink-0"
                   >
                     View All 256 &rarr;
@@ -775,7 +868,7 @@ export default function Home() {
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800 font-semibold uppercase">
-                  <span>{COUNTRY_TABS.find(t=>t.id===activeCountry)?.name} Developer</span>
+                  <span>{currentRegion.name} Developer</span>
                   <div className="flex items-center gap-6">
                     <span className="hidden sm:inline">Location</span>
                     <span>Contributions</span>
@@ -805,7 +898,7 @@ export default function Home() {
                           </h4>
                           {idx === 0 && (
                             <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[10px] py-0">
-                              #1 {COUNTRY_TABS.find(t=>t.id===activeCountry)?.name}
+                              #1 {currentRegion.name}
                             </Badge>
                           )}
                         </div>
@@ -829,13 +922,13 @@ export default function Home() {
               // Default fallback for countries with few seeded developers
               <div className="p-6 text-center">
                 <p className="text-sm text-slate-400 mb-4">
-                  No cached profiles indexed yet for {COUNTRY_TABS.find(t=>t.id===activeCountry)?.name}.
+                  No cached profiles indexed yet for {currentRegion.name}.
                 </p>
                 <Link
-                  href={`/profile/${COUNTRY_TABS.find(t=>t.id===activeCountry)?.highlight || 'waleedcodes'}`}
+                  href={`/profile/${currentRegion.highlight || 'waleedcodes'}`}
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
                 >
-                  <span>Explore Featured Profile: @{COUNTRY_TABS.find(t=>t.id===activeCountry)?.highlight || 'waleedcodes'}</span>
+                  <span>Explore Featured Profile: @{currentRegion.highlight || 'waleedcodes'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>

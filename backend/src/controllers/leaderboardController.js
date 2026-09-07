@@ -1,6 +1,7 @@
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ErrorFactory } = require('../middleware/errorHandler');
 const User = require('../models/User');
+const RankingSnapshot = require('../models/RankingSnapshot');
 const Analytics = require('../models/Analytics');
 const logger = require('../utils/logger');
 const Helpers = require('../utils/helpers');
@@ -34,8 +35,8 @@ class LeaderboardController {
       CACHE_KEYS.LEADERBOARD,
       cacheKey,
       async () => {
-        // Build query based on category
-        const query = { isActive: true };
+        // Build query based on category (strictly individual developers)
+        const query = { isActive: true, accountType: { $ne: 'Organization' } };
         
         if (location) {
           query.location = { $regex: location, $options: 'i' };
@@ -85,15 +86,16 @@ class LeaderboardController {
               const userService = new UserService();
 
               logger.info(`🔍 Live discovering active GitHub developers for location: ${location}`);
-              const searchRes = await githubService.searchUsers(`location:"${location}"`, {
+              const searchRes = await githubService.searchUsers(`location:"${location}" type:user`, {
                 sort: 'followers',
                 order: 'desc',
                 per_page: 15
               });
 
               if (searchRes && searchRes.users) {
+                const individualDevelopers = searchRes.users.filter(u => u.type !== 'Organization');
                 // Sync top 5 developers concurrently for ultra-fast first-time response
-                const fastBatch = searchRes.users.slice(0, 5);
+                const fastBatch = individualDevelopers.slice(0, 5);
                 await Promise.allSettled(
                   fastBatch.map(async (u) => {
                     const existing = await User.findOne({ username: u.username.toLowerCase() });
@@ -104,7 +106,7 @@ class LeaderboardController {
                 );
 
                 // Crawl and sync the next batch in the background
-                const nextBatch = searchRes.users.slice(5, 15);
+                const nextBatch = individualDevelopers.slice(5, 15);
                 (async () => {
                   for (const u of nextBatch) {
                     try {
@@ -354,6 +356,7 @@ class LeaderboardController {
 
         const topUsers = await User.find({ 
           isActive: true,
+          accountType: { $ne: 'Organization' },
           [sortField]: { $gt: 0 }
         })
         .sort({ [sortField]: -1 })
@@ -555,9 +558,10 @@ class LeaderboardController {
       const rank = await User.countDocuments({
         [field]: { $gt: user[field] },
         isActive: true,
+        accountType: { $ne: 'Organization' },
       }) + 1;
 
-      const total = await User.countDocuments({ isActive: true });
+      const total = await User.countDocuments({ isActive: true, accountType: { $ne: 'Organization' } });
       const percentile = Math.round((1 - (rank - 1) / total) * 100);
 
       rankings[category.trim()] = {
@@ -575,11 +579,13 @@ class LeaderboardController {
         totalCommits: { $gt: user.totalCommits },
         location: { $regex: user.location, $options: 'i' },
         isActive: true,
+        accountType: { $ne: 'Organization' },
       }) + 1;
 
       const locationTotal = await User.countDocuments({
         location: { $regex: user.location, $options: 'i' },
         isActive: true,
+        accountType: { $ne: 'Organization' },
       });
 
       rankings.location = {
@@ -654,6 +660,182 @@ class LeaderboardController {
 
     return totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0;
   }
+
+  /**
+   * @desc    Get algorithmic featured developers (Worldwide, Pakistan, Language Leaders)
+   * @route   GET /api/leaderboard/featured
+   * @access  Public
+   */
+  static getFeaturedDevelopers = asyncHandler(async (req, res) => {
+    const cacheKey = 'featured_developers_v2';
+
+    const data = await CacheManager.getOrSet(
+      CACHE_KEYS.LEADERBOARD,
+      cacheKey,
+      async () => {
+        const selectFields = 'username name avatarUrl location totalContributions totalCommits totalPullRequests followers topLanguages countryRank globalRank';
+
+        const [worldwide, pakistan, javascript, typescript, python] = await Promise.all([
+          // Top worldwide maintainers
+          User.find({ isActive: true, accountType: { $ne: 'Organization' } })
+            .sort({ totalContributions: -1 })
+            .limit(6)
+            .select(selectFields)
+            .lean(),
+
+          // Top Pakistan maintainers
+          User.find({ 
+            isActive: true, 
+            accountType: { $ne: 'Organization' },
+            location: { $regex: 'pakistan', $options: 'i' }
+          })
+            .sort({ totalContributions: -1 })
+            .limit(6)
+            .select(selectFields)
+            .lean(),
+
+          // Top JavaScript maintainers
+          User.find({ 
+            isActive: true, 
+            accountType: { $ne: 'Organization' },
+            'topLanguages.name': { $regex: '^javascript$', $options: 'i' }
+          })
+            .sort({ totalContributions: -1 })
+            .limit(4)
+            .select(selectFields)
+            .lean(),
+
+          // Top TypeScript maintainers
+          User.find({ 
+            isActive: true, 
+            accountType: { $ne: 'Organization' },
+            'topLanguages.name': { $regex: '^typescript$', $options: 'i' }
+          })
+            .sort({ totalContributions: -1 })
+            .limit(4)
+            .select(selectFields)
+            .lean(),
+
+          // Top Python maintainers
+          User.find({ 
+            isActive: true, 
+            accountType: { $ne: 'Organization' },
+            'topLanguages.name': { $regex: '^python$', $options: 'i' }
+          })
+            .sort({ totalContributions: -1 })
+            .limit(4)
+            .select(selectFields)
+            .lean(),
+        ]);
+
+        return {
+          worldwide,
+          pakistan,
+          languages: {
+            javascript,
+            typescript,
+            python,
+          },
+          generatedAt: new Date().toISOString(),
+        };
+      },
+      10 * 60 // 10 minutes cache
+    );
+
+    res.json({
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Get dynamic region list with active maintainer counts
+   * @route   GET /api/leaderboard/regions
+   * @access  Public
+   */
+  static getRegions = asyncHandler(async (req, res) => {
+    const cacheKey = 'leaderboard_regions_v2';
+
+    const regions = await CacheManager.getOrSet(
+      CACHE_KEYS.LEADERBOARD,
+      cacheKey,
+      async () => {
+        // Aggregate distinct active regions from MongoDB
+        const regionAggregation = await User.aggregate([
+          { $match: { isActive: true, accountType: { $ne: 'Organization' }, location: { $exists: true, $ne: null, $ne: '' } } },
+          { $group: { _id: '$location', count: { $sum: 1 }, totalContributions: { $sum: '$totalContributions' } } },
+          { $sort: { count: -1 } },
+          { $limit: 30 }
+        ]);
+
+        // Also fetch latest snapshots metadata
+        const snapshots = await RankingSnapshot.find().sort({ generatedAt: -1 }).limit(10).lean();
+        const snapshotMap = new Map();
+        snapshots.forEach(s => {
+          if (!snapshotMap.has(s.regionKey)) {
+            snapshotMap.set(s.regionKey, s);
+          }
+        });
+
+        // Built-in core regional metadata
+        const CORE_REGIONS = [
+          { id: 'all', name: 'Worldwide', flag: '🌍', query: '' },
+          { id: 'pakistan', name: 'Pakistan', flag: '🇵🇰', query: 'Pakistan' },
+          { id: 'usa', name: 'United States', flag: '🇺🇸', query: 'United States' },
+          { id: 'india', name: 'India', flag: '🇮🇳', query: 'India' },
+          { id: 'germany', name: 'Germany', flag: '🇩🇪', query: 'Germany' },
+          { id: 'france', name: 'France', flag: '🇫🇷', query: 'France' },
+          { id: 'japan', name: 'Japan', flag: '🇯🇵', query: 'Japan' },
+          { id: 'canada', name: 'Canada', flag: '🇨🇦', query: 'Canada' },
+          { id: 'united_kingdom', name: 'United Kingdom', flag: '🇬🇧', query: 'United Kingdom' },
+          { id: 'singapore', name: 'Singapore', flag: '🇸🇬', query: 'Singapore' },
+        ];
+
+        return CORE_REGIONS.map(reg => {
+          const snap = snapshotMap.get(reg.id);
+          const agg = regionAggregation.find(a => a._id && a._id.toLowerCase().includes(reg.name.toLowerCase()));
+          return {
+            ...reg,
+            indexedMaintainers: agg ? agg.count : (snap ? snap.usersRanked : 0),
+            totalUsersFound: snap ? snap.totalUsersFound : (agg ? agg.count * 100 : null),
+            minimumFollowers: snap ? snap.minimumFollowers : 0,
+            lastSnapshotAt: snap ? snap.generatedAt : null,
+          };
+        });
+      },
+      15 * 60
+    );
+
+    res.json({
+      success: true,
+      data: regions,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Get regional ranking snapshots
+   * @route   GET /api/leaderboard/snapshots
+   * @access  Public
+   */
+  static getRankingSnapshots = asyncHandler(async (req, res) => {
+    const { region = 'pakistan', limit = 5 } = req.query;
+    const regionKey = region.toLowerCase().trim().replace(/\s+/g, '_');
+
+    const snapshots = await RankingSnapshot.find({ regionKey })
+      .sort({ generatedAt: -1 })
+      .limit(parseInt(limit, 10))
+      .select('-__v');
+
+    res.json({
+      success: true,
+      data: snapshots,
+      region,
+      totalSnapshots: snapshots.length,
+      timestamp: new Date().toISOString(),
+    });
+  });
 }
 
 module.exports = LeaderboardController;

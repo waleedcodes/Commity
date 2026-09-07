@@ -105,7 +105,7 @@ const analyticsQuerySchema = Joi.object({
 // Leaderboard query schema
 const leaderboardQuerySchema = Joi.object({
   category: Joi.string().valid(
-    'commits', 'repositories', 'followers', 'contributions', 'streak'
+    'commits', 'repositories', 'followers', 'contributions', 'public_contributions', 'private_contributions', 'streak'
   ).default('commits'),
   period: Joi.string()
     .valid(...Object.values(ANALYTICS_PERIODS), 'allTime', '1d', '7d', '30d', '90d', '365d')

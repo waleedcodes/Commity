@@ -67,6 +67,7 @@ app.get('/health', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.get('/api/platform/stats', require('./controllers/analyticsController').getPlatformStats);
 
 // Handle 404 routes
 app.use('*', notFound);

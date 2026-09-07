@@ -79,16 +79,20 @@ class UserService {
           }
         }
 
-        // Fetch user data from GitHub
-        const [profile, contributions, languages] = await Promise.all([
-          githubService.getUserProfile(username),
-          githubService.getUserContributions(username).catch(() => null),
+        // Fetch user profile first to verify account type
+        const profile = await githubService.getUserProfile(username);
+        const isOrg = profile.type === 'Organization' || profile.accountType === 'Organization';
+
+        // Only query user contributions if not an organization
+        const [contributions, languages] = await Promise.all([
+          isOrg ? Promise.resolve(null) : githubService.getUserContributions(username).catch(() => null),
           githubService.getUserLanguages(username).catch(() => null),
         ]);
 
         // Merge data
         const userData = {
           ...profile,
+          accountType: isOrg ? 'Organization' : 'User',
           ...(contributions && {
             totalContributions: contributions.totalContributions || 0,
             publicContributions: contributions.publicContributions || contributions.totalContributions || 0,
@@ -363,9 +367,11 @@ class UserService {
     const GitHubService = require('./githubService');
     const githubService = new GitHubService();
 
-    const [profile, contributions, languages] = await Promise.all([
-      githubService.getUserProfile(username),
-      githubService.getUserContributions(username).catch(err => {
+    const profile = await githubService.getUserProfile(username);
+    const isOrg = profile.type === 'Organization' || profile.accountType === 'Organization';
+
+    const [contributions, languages] = await Promise.all([
+      isOrg ? Promise.resolve(null) : githubService.getUserContributions(username).catch(err => {
         logger.warn(`Failed to fetch contributions for ${username}: ${err.message}`);
         return null;
       }),
@@ -377,6 +383,7 @@ class UserService {
 
     const userData = {
       ...profile,
+      accountType: isOrg ? 'Organization' : 'User',
       ...(contributions && {
         totalContributions: contributions.totalContributions || 0,
         publicContributions: contributions.publicContributions || contributions.totalContributions || 0,

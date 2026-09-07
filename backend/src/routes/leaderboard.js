@@ -32,6 +32,33 @@ router.get('/stats',
 );
 
 /**
+ * @route   GET /api/leaderboard/featured
+ * @desc    Get algorithmic featured developers (Worldwide, Regional, Language Leaders)
+ * @access  Public
+ */
+router.get('/featured',
+  LeaderboardController.getFeaturedDevelopers
+);
+
+/**
+ * @route   GET /api/leaderboard/regions
+ * @desc    Get dynamic region list with active maintainer counts
+ * @access  Public
+ */
+router.get('/regions',
+  LeaderboardController.getRegions
+);
+
+/**
+ * @route   GET /api/leaderboard/snapshots
+ * @desc    Get regional ranking snapshots history
+ * @access  Public
+ */
+router.get('/snapshots',
+  LeaderboardController.getRankingSnapshots
+);
+
+/**
  * @route   GET /api/leaderboard/contributors
  * @desc    Get top contributors
  * @access  Public

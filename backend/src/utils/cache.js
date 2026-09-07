@@ -317,56 +317,52 @@ class CacheManager {
     const redisKey = `${cacheType}:${key}`;
     const effectiveTtl = ttl || (cacheConfigs[cacheType] && cacheConfigs[cacheType].stdTTL) || 300;
 
-    try {
-      // 1. Check Redis if ready
-      if (redisClient && redisClient.status === 'ready') {
-        try {
-          const cachedRedis = await redisClient.get(redisKey);
-          if (cachedRedis !== null) {
-            logger.debug(`Redis Cache HIT: ${redisKey}`);
-            return JSON.parse(cachedRedis);
-          }
-        } catch (rErr) {
-          logger.warn(`Redis GET failed (${rErr.message}), falling back to memory/fn`);
-        }
-      }
-
-      // 2. Try in-memory cache
-      let value = this.get(cacheType, key);
-      
-      if (value !== null) {
-        logger.debug(`Cache HIT: ${cacheType}:${key}`);
-        return value;
-      }
-      
-      // 3. Cache miss - execute function
-      logger.debug(`Cache MISS: ${cacheType}:${key} - executing function`);
-      value = await fn();
-      
-      // 4. Cache the result in memory and Redis
-      if (value !== null && value !== undefined) {
-        this.set(cacheType, key, value, ttl);
-
-        if (redisClient && redisClient.status === 'ready') {
-          try {
-            await redisClient.set(redisKey, JSON.stringify(value), 'EX', effectiveTtl);
-          } catch (rSetErr) {
-            logger.warn(`Redis SET failed (${rSetErr.message})`);
-          }
-        }
-      }
-      
-      return value;
-    } catch (error) {
-      logger.error(`Error in cache getOrSet ${cacheType}:${key}:`, error.message);
-      // If caching fails, still try to execute the function
+    // 1. Check Redis if ready
+    if (redisClient && redisClient.status === 'ready') {
       try {
-        return await fn();
-      } catch (fnError) {
-        logger.error(`Function execution failed in getOrSet:`, fnError.message);
-        throw fnError;
+        const cachedRedis = await redisClient.get(redisKey);
+        if (cachedRedis !== null) {
+          logger.debug(`Redis Cache HIT: ${redisKey}`);
+          return JSON.parse(cachedRedis);
+        }
+      } catch (rErr) {
+        logger.warn(`Redis GET failed (${rErr.message}), falling back to memory/fn`);
       }
     }
+
+    // 2. Try in-memory cache
+    try {
+      const memoryValue = this.get(cacheType, key);
+      if (memoryValue !== null) {
+        logger.debug(`Cache HIT: ${cacheType}:${key}`);
+        return memoryValue;
+      }
+    } catch (memErr) {
+      logger.warn(`Memory cache GET error: ${memErr.message}`);
+    }
+
+    // 3. Cache miss - execute function directly
+    logger.debug(`Cache MISS: ${cacheType}:${key} - executing function`);
+    const value = await fn();
+
+    // 4. Cache the result in memory and Redis (non-blocking errors)
+    if (value !== null && value !== undefined) {
+      try {
+        this.set(cacheType, key, value, ttl);
+      } catch (setErr) {
+        logger.warn(`Cache SET error ${cacheType}:${key}: ${setErr.message}`);
+      }
+
+      if (redisClient && redisClient.status === 'ready') {
+        try {
+          await redisClient.set(redisKey, JSON.stringify(value), 'EX', effectiveTtl);
+        } catch (rSetErr) {
+          logger.warn(`Redis SET failed (${rSetErr.message})`);
+        }
+      }
+    }
+
+    return value;
   }
   
   /**

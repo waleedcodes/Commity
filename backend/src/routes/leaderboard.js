@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] leaderboard.js
+// [Commity Core Phase 2: Logic] leaderboard.js
 const express = require('express');
 const router = express.Router();
 
@@ -33,6 +33,33 @@ router.get('/stats',
 );
 
 /**
+ * @route   GET /api/leaderboard/featured
+ * @desc    Get algorithmic featured developers (Worldwide, Regional, Language Leaders)
+ * @access  Public
+ */
+router.get('/featured',
+  LeaderboardController.getFeaturedDevelopers
+);
+
+/**
+ * @route   GET /api/leaderboard/regions
+ * @desc    Get dynamic region list with active maintainer counts
+ * @access  Public
+ */
+router.get('/regions',
+  LeaderboardController.getRegions
+);
+
+/**
+ * @route   GET /api/leaderboard/snapshots
+ * @desc    Get regional ranking snapshots history
+ * @access  Public
+ */
+router.get('/snapshots',
+  LeaderboardController.getRankingSnapshots
+);
+
+/**
  * @route   GET /api/leaderboard/contributors
  * @desc    Get top contributors
  * @access  Public
@@ -56,46 +83,3 @@ router.get('/repositories',
  * @route   GET /api/leaderboard/location/:location
  * @desc    Get leaderboard filtered by location
  * @access  Public
- */
-router.get('/location/:location',
-  validateLeaderboardQuery,
-  LeaderboardController.getLeaderboardByLocation
-);
-
-/**
- * @route   GET /api/leaderboard/language/:language
- * @desc    Get leaderboard filtered by programming language
- * @access  Public
- */
-router.get('/language/:language',
-  validateLeaderboardQuery,
-  LeaderboardController.getLeaderboardByLanguage
-);
-
-/**
- * @route   GET /api/leaderboard/trending
- * @desc    Get trending contributors
- * @access  Public
- */
-router.get('/trending',
-  validateLeaderboardQuery,
-  LeaderboardController.getTopContributors
-);
-
-/**
- * @route   GET /api/leaderboard/user/:username
- * @route   GET /api/leaderboard/user/:username/rank
- * @desc    Get specific user's ranking across different categories
- * @access  Public
- */
-router.get('/user/:username',
-  validateLeaderboardQuery,
-  LeaderboardController.getUserRanking
-);
-
-router.get('/user/:username/rank',
-  validateLeaderboardQuery,
-  LeaderboardController.getUserRanking
-);
-
-module.exports = router;

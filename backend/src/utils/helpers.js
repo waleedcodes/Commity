@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] helpers.js
 const moment = require('moment');
 const { REGEX, TIME } = require('../config/constants');
 
@@ -287,3 +286,147 @@ class Helpers {
    * Sleep for specified milliseconds
    * @param {number} ms - Milliseconds to sleep
    * @returns {Promise} Promise that resolves after sleep
+   */
+  static sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  /**
+   * Check if value is empty (null, undefined, empty string, empty array, empty object)
+   * @param {any} value - Value to check
+   * @returns {boolean} True if empty
+   */
+  static isEmpty(value) {
+    if (value === null || value === undefined) {
+      return true;
+    }
+    
+    if (typeof value === 'string') {
+      return value.trim().length === 0;
+    }
+    
+    if (Array.isArray(value)) {
+      return value.length === 0;
+    }
+    
+    if (typeof value === 'object') {
+      return Object.keys(value).length === 0;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Generate pagination metadata
+   * @param {number} page - Current page
+   * @param {number} limit - Items per page
+   * @param {number} totalItems - Total number of items
+   * @returns {object} Pagination metadata
+   */
+  static generatePaginationMeta(page, limit, totalItems) {
+    const totalPages = Math.ceil(totalItems / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+    
+    return {
+      currentPage: page,
+      totalPages,
+      totalItems,
+      itemsPerPage: limit,
+      hasNextPage,
+      hasPrevPage,
+      nextPage: hasNextPage ? page + 1 : null,
+      prevPage: hasPrevPage ? page - 1 : null,
+    };
+  }
+  
+  /**
+   * Convert camelCase to snake_case
+   * @param {string} str - String to convert
+   * @returns {string} snake_case string
+   */
+  static camelToSnake(str) {
+    return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+  }
+  
+  /**
+   * Convert snake_case to camelCase
+   * @param {string} str - String to convert
+   * @returns {string} camelCase string
+   */
+  static snakeToCamel(str) {
+    return str.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+  }
+  
+  /**
+   * Calculate contribution score based on different factors
+   * @param {object} contributions - Contribution data
+   * @returns {number} Calculated score
+   */
+  static calculateContributionScore(contributions) {
+    const weights = {
+      commits: 1,
+      pullRequests: 3,
+      issues: 2,
+      reviews: 2,
+      releases: 5,
+    };
+    
+    let score = 0;
+    Object.entries(contributions).forEach(([type, count]) => {
+      if (weights[type]) {
+        score += count * weights[type];
+      }
+    });
+    
+    return score;
+  }
+  
+  /**
+   * Generate color based on string hash
+   * @param {string} str - String to generate color from
+   * @returns {string} Hex color code
+   */
+  static generateColorFromString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+    return '#' + '00000'.substring(0, 6 - color.length) + color;
+  }
+  
+  /**
+   * Chunk array into smaller arrays
+   * @param {Array} array - Array to chunk
+   * @param {number} size - Chunk size
+   * @returns {Array} Array of chunks
+   */
+  /**
+   * Calculate median of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateMedian(values) {
+    if (!values || values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  }
+
+  /**
+   * Calculate standard deviation of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateStandardDeviation(values) {
+    if (!values || values.length === 0) return 0;
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const squareDiffs = values.map(val => Math.pow(val - mean, 2));
+    const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
+    return Math.sqrt(avgSquareDiff);
+  }
+}
+
+module.exports = Helpers;

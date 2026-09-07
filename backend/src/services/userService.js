@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] userService.js
 const User = require('../models/User');
 const Analytics = require('../models/Analytics');
 const logger = require('../utils/logger');
@@ -376,3 +375,192 @@ class UserService {
         logger.warn(`Failed to fetch contributions for ${username}: ${err.message}`);
         return null;
       }),
+      githubService.getUserLanguages(username).catch(err => {
+        logger.warn(`Failed to fetch languages for ${username}: ${err.message}`);
+        return null;
+      }),
+    ]);
+
+    const userData = {
+      ...profile,
+      accountType: isOrg ? 'Organization' : 'User',
+      ...(contributions && {
+        totalContributions: contributions.totalContributions || 0,
+        publicContributions: contributions.publicContributions || contributions.totalContributions || 0,
+        privateContributions: contributions.privateContributions || 0,
+        totalCommits: contributions.totalCommits || 0,
+        totalPullRequests: contributions.totalPullRequests || 0,
+        totalIssues: contributions.totalIssues || 0,
+        totalReviews: contributions.totalReviews || 0,
+        contributionStreak: contributions.contributionStreak || 0,
+        longestStreak: contributions.longestStreak || 0,
+        contributionCalendar: contributions.contributionCalendar || [],
+      }),
+      ...(languages && { 
+        topLanguages: languages.slice(0, 10).map(lang => ({
+          name: lang.name,
+          percentage: lang.percentage,
+          bytes: lang.bytes,
+          color: lang.color || '#f1c40f'
+        }))
+      }),
+      lastFetchedAt: new Date(),
+      lastAnalyticsUpdate: new Date()
+    };
+
+    const user = await this.createOrUpdateUser(userData);
+    await user.updateRank('totalContributions');
+    return user;
+  }
+
+  /**
+   * Check if analytics were recently calculated
+   * @private
+   */
+  _isRecentlyCalculated(analytics) {
+    const threshold = 30 * 60 * 1000; // 30 minutes
+    return analytics.lastCalculatedAt && (Date.now() - analytics.lastCalculatedAt.getTime()) < threshold;
+  }
+
+  /**
+   * Calculate contributions from events
+   * @private
+   */
+  _calculateContributions(events) {
+    const contributions = {
+      commits: 0,
+      pullRequests: 0,
+      issues: 0,
+      reviews: 0,
+      total: 0,
+    };
+
+    events.forEach(event => {
+      switch (event.type) {
+        case 'PushEvent':
+          contributions.commits += event.payload?.commits || 1;
+          break;
+        case 'PullRequestEvent':
+          if (event.payload?.action === 'opened') {
+            contributions.pullRequests++;
+          }
+          break;
+        case 'IssuesEvent':
+          if (event.payload?.action === 'opened') {
+            contributions.issues++;
+          }
+          break;
+        case 'PullRequestReviewEvent':
+          contributions.reviews++;
+          break;
+      }
+    });
+
+    contributions.total = contributions.commits + contributions.pullRequests + contributions.issues + contributions.reviews;
+    return contributions;
+  }
+
+  /**
+   * Calculate repository metrics
+   * @private
+   */
+  _calculateRepositoryMetrics(repositories, startDate, endDate) {
+    const metrics = {
+      created: 0,
+      forked: 0,
+      starred: 0,
+      totalStars: 0,
+      totalForks: 0,
+    };
+
+    repositories.forEach(repo => {
+      if (repo.createdAt >= startDate && repo.createdAt <= endDate) {
+        if (repo.fork) {
+          metrics.forked++;
+        } else {
+          metrics.created++;
+        }
+      }
+      
+      metrics.totalStars += repo.stargazersCount;
+      metrics.totalForks += repo.forksCount;
+    });
+
+    return metrics;
+  }
+
+  /**
+   * Calculate activity patterns
+   * @private
+   */
+  _calculateActivityPatterns(events) {
+    const patterns = {
+      byHour: Array(24).fill(0).map((_, i) => ({ hour: i, count: 0 })),
+      byDayOfWeek: Array(7).fill(0).map((_, i) => ({ day: i, count: 0 })),
+      byMonth: Array(12).fill(0).map((_, i) => ({ month: i + 1, count: 0 })),
+    };
+
+    events.forEach(event => {
+      const date = new Date(event.createdAt);
+      
+      patterns.byHour[date.getHours()].count++;
+      patterns.byDayOfWeek[date.getDay()].count++;
+      patterns.byMonth[date.getMonth()].count++;
+    });
+
+    return patterns;
+  }
+
+  /**
+   * Calculate collaboration metrics
+   * @private
+   */
+  _calculateCollaborationMetrics(events, repositories) {
+    const uniqueRepos = new Set();
+    const uniqueCollaborators = new Set();
+    let organizationContributions = 0;
+    let openSourceContributions = 0;
+
+    events.forEach(event => {
+      if (event.repo) {
+        uniqueRepos.add(event.repo.name);
+        
+        // Check if it's an organization repo (contains a slash and isn't user's own repo)
+        if (event.repo.name.includes('/') && !event.repo.name.startsWith(event.actor.login + '/')) {
+          organizationContributions++;
+        }
+      }
+    });
+
+    repositories.forEach(repo => {
+      if (!repo.private) {
+        openSourceContributions++;
+      }
+    });
+
+    return {
+      uniqueRepositories: uniqueRepos.size,
+      uniqueCollaborators: uniqueCollaborators.size,
+      organizationContributions,
+      openSourceContributions,
+    };
+  }
+
+  /**
+   * Helper methods for date calculations
+   * @private
+   */
+  _getDaysBetween(startDate, endDate) {
+    return Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+  }
+
+  _getWeeksBetween(startDate, endDate) {
+    return Math.ceil(this._getDaysBetween(startDate, endDate) / 7);
+  }
+
+  _getMonthsBetween(startDate, endDate) {
+    return Math.ceil(this._getDaysBetween(startDate, endDate) / 30);
+  }
+}
+
+module.exports = UserService;

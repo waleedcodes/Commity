@@ -32,6 +32,8 @@ class GitHubService {
           const profile = {
             githubId: data.id,
             username: data.login,
+            type: data.type || 'User',
+            accountType: data.type || 'User',
             name: data.name,
             email: data.email,
             bio: data.bio,
@@ -304,16 +306,34 @@ class GitHubService {
           return contributionsData;
         } catch (error) {
           if (error.message && error.message.includes('Could not resolve to a User')) {
-            throw ErrorFactory.notFound(`GitHub user '${username}' not found`);
+            logger.info(`GitHub login '${username}' is not a User account (likely an Organization). Returning zeroed contribution metrics.`);
+            return {
+              totalContributions: 0,
+              publicContributions: 0,
+              privateContributions: 0,
+              totalCommits: 0,
+              totalIssues: 0,
+              totalPullRequests: 0,
+              totalReviews: 0,
+              totalRepositories: 0,
+              contributionStreak: 0,
+              longestStreak: 0,
+              contributionCalendar: [],
+              topRepositories: [],
+            };
           }
           logger.warn(`GraphQL contributions fetch failed for ${username}, falling back to defaults: ${error.message}`);
           return {
             totalContributions: 0,
+            publicContributions: 0,
+            privateContributions: 0,
             totalCommits: 0,
             totalIssues: 0,
             totalPullRequests: 0,
             totalReviews: 0,
             totalRepositories: 0,
+            contributionStreak: 0,
+            longestStreak: 0,
             contributionCalendar: [],
             topRepositories: [],
           };
@@ -388,10 +408,16 @@ class GitHubService {
    */
   async searchUsers(query, options = {}) {
     try {
-      logger.info(`Searching GitHub users: ${query}`);
+      // Ensure search query specifically targets individual developers (type:user)
+      let finalQuery = query || '';
+      if (!finalQuery.includes('type:')) {
+        finalQuery = `${finalQuery} type:user`.trim();
+      }
+
+      logger.info(`Searching GitHub users: ${finalQuery}`);
       
       const params = {
-        q: query,
+        q: finalQuery,
         sort: options.sort || 'followers',
         order: options.order || 'desc',
         per_page: options.per_page || 30,
@@ -400,10 +426,13 @@ class GitHubService {
 
       const { data } = await this.octokit.rest.search.users(params);
 
+      // Filter out any organization accounts just in case
+      const individualUsers = (data.items || []).filter(user => user.type !== 'Organization');
+
       const results = {
         totalCount: data.total_count,
         incompleteResults: data.incomplete_results,
-        users: data.items.map(user => ({
+        users: individualUsers.map(user => ({
           githubId: user.id,
           username: user.login,
           avatarUrl: user.avatar_url,
@@ -413,7 +442,7 @@ class GitHubService {
         })),
       };
 
-      logger.info(`Found ${results.totalCount} users for query: ${query}`);
+      logger.info(`Found ${results.users.length} individual users (out of ${results.totalCount}) for query: ${finalQuery}`);
       return results;
     } catch (error) {
       throw ErrorFactory.githubAPI(`Search failed: ${error.message}`, error.status);

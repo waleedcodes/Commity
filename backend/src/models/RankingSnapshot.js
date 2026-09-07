@@ -80,3 +80,44 @@ const rankingSnapshotSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
     index: true,
+  },
+  totalUsersFound: {
+    type: Number,
+    default: 0,
+  },
+  minimumFollowers: {
+    type: Number,
+    default: 0,
+  },
+  candidatesConsidered: {
+    type: Number,
+    default: 0,
+  },
+  usersRanked: {
+    type: Number,
+    default: 0,
+  },
+  cadence: {
+    type: String,
+    default: '7-Day Weekly Snapshots',
+  },
+  dataSource: {
+    type: String,
+    default: 'GitHub GraphQL API (Direct Verified)',
+  },
+  rankings: [rankedUserSchema],
+}, {
+  timestamps: true,
+});
+
+// Indexes for performance
+rankingSnapshotSchema.index({ regionKey: 1, generatedAt: -1 });
+rankingSnapshotSchema.index({ region: 1, generatedAt: -1 });
+
+// Static helper to get the latest snapshot for a region
+rankingSnapshotSchema.statics.getLatestForRegion = function(regionKey) {
+  const normalizedKey = (regionKey || '').toLowerCase().trim();
+  return this.findOne({ regionKey: normalizedKey }).sort({ generatedAt: -1 });
+};
+
+module.exports = mongoose.model('RankingSnapshot', rankingSnapshotSchema);

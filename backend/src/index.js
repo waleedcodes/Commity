@@ -94,7 +94,9 @@ const shutdown = async (signal) => {
   } else {
     try {
       await mongoose.connection.close();
-    } catch (e) {}
+    } catch (_err) {
+      // Ignored on forced exit
+    }
     process.exit(0);
   }
 };

@@ -22,7 +22,31 @@ class AnalyticsService {
       }
 
       // Get user's GitHub activity for the date
-      const githubData = await GitHubService.getUserActivity(username, date);
+      const githubService = new GitHubService();
+      let events = [];
+      try {
+        events = await githubService.getUserEvents(username, { per_page: 100 });
+      } catch (e) {
+        logger.warn(`Could not fetch events for ${username}: ${e.message}`);
+      }
+
+      const targetDateStr = date.toISOString().split('T')[0];
+      const dayEvents = (events || []).filter(e => {
+        const dStr = e.createdAt ? new Date(e.createdAt).toISOString().split('T')[0] : '';
+        return dStr === targetDateStr;
+      });
+
+      let commits = 0;
+      let pullRequests = 0;
+      let issues = 0;
+      let reviews = 0;
+
+      dayEvents.forEach(e => {
+        if (e.type === 'PushEvent') commits += (e.payload?.commits || 1);
+        else if (e.type === 'PullRequestEvent') pullRequests += 1;
+        else if (e.type === 'IssuesEvent') issues += 1;
+        else if (e.type === 'PullRequestReviewEvent') reviews += 1;
+      });
       
       // Create or update analytics record
       const analyticsData = {
@@ -33,14 +57,14 @@ class AnalyticsService {
         startDate: new Date(date.toDateString()),
         endDate: new Date(date.toDateString()),
         period: 'daily',
-        commits: githubData.commits || 0,
-        pullRequests: githubData.pullRequests || 0,
-        issues: githubData.issues || 0,
-        reviews: githubData.reviews || 0,
-        repositories: githubData.repositories || [],
-        languages: githubData.languages || [],
-        additions: githubData.additions || 0,
-        deletions: githubData.deletions || 0,
+        commits,
+        pullRequests,
+        issues,
+        reviews,
+        repositories: [],
+        languages: [],
+        additions: 0,
+        deletions: 0,
         contributions: {
           commits: githubData.commits || 0,
           pullRequests: githubData.pullRequests || 0,

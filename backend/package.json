@@ -7,7 +7,7 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed": "node scripts/seed.js",
-    "test": "jest",
+    "test": "jest --forceExit",
     "lint": "eslint src/",
     "format": "prettier --write src/"
   },

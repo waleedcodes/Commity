@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -243,3 +242,125 @@ userSchema.index({ lastAnalyticsUpdate: 1 });
 userSchema.index({ isActive: 1, isVerified: 1 });
 
 // High performance compound indexes for scaling leaderboards & queries
+userSchema.index({ accountType: 1 });
+userSchema.index({ isActive: 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, totalCommits: -1 });
+userSchema.index({ isActive: 1, followers: -1 });
+userSchema.index({ isActive: 1, publicRepos: -1 });
+userSchema.index({ isActive: 1, longestStreak: -1 });
+userSchema.index({ isActive: 1, location: 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, 'topLanguages.name': 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, lastAnalyticsUpdate: -1 });
+userSchema.index({ isActive: 1, accountType: 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, accountType: 1, totalCommits: -1 });
+userSchema.index({ isActive: 1, accountType: 1, followers: -1 });
+userSchema.index({ isActive: 1, accountType: 1, longestStreak: -1 });
+userSchema.index({ isActive: 1, accountType: 1, location: 1, totalContributions: -1 });
+
+// Virtual for GitHub login alias
+userSchema.virtual('login').get(function() {
+  return this.username;
+});
+
+// Virtual for currentStreak alias
+userSchema.virtual('currentStreak')
+  .get(function() {
+    return this.contributionStreak;
+  })
+  .set(function(value) {
+    this.contributionStreak = value;
+  });
+
+// Virtual for account age in days
+userSchema.virtual('accountAge').get(function() {
+  return Math.floor((Date.now() - this.githubCreatedAt) / (1000 * 60 * 60 * 24));
+});
+
+// Virtual for profile completion percentage
+userSchema.virtual('profileCompletion').get(function() {
+  let completion = 0;
+  const fields = ['name', 'bio', 'company', 'location', 'blog', 'email'];
+  
+  fields.forEach(field => {
+    if (this[field] && this[field].trim()) {
+      completion += 1;
+    }
+  });
+  
+  return Math.round((completion / fields.length) * 100);
+});
+
+// Pre-save middleware
+userSchema.pre('save', function(next) {
+  // If totalContributions is not set or 0, compute from components as fallback
+  if (!this.totalContributions || this.totalContributions === 0) {
+    const calculatedSum = (this.totalCommits || 0) + 
+                          (this.totalPullRequests || 0) + 
+                          (this.totalIssues || 0) + 
+                          (this.totalReviews || 0);
+    if (calculatedSum > 0) {
+      this.totalContributions = calculatedSum;
+    }
+  }
+
+  // Update timestamps if analytics data changed
+  if (this.isModified('totalCommits') || this.isModified('totalPullRequests') || 
+      this.isModified('totalIssues') || this.isModified('totalReviews') ||
+      this.isModified('totalContributions')) {
+    this.lastFetchedAt = new Date();
+    this.lastAnalyticsUpdate = new Date();
+    this.statsUpdatedAt = new Date();
+  }
+  
+  next();
+});
+
+// Static methods
+userSchema.statics.findByUsername = function(username) {
+  return this.findOne({ username: username.toLowerCase() });
+};
+
+userSchema.statics.findByGitHubId = function(githubId) {
+  return this.findOne({ githubId });
+};
+
+userSchema.statics.getLeaderboard = function(category = 'totalCommits', limit = 100, location = null) {
+  const query = { isActive: true, accountType: { $ne: 'Organization' } };
+  
+  if (location) {
+    query.location = new RegExp(location, 'i');
+  }
+  
+  return this.find(query)
+    .sort({ [category]: -1 })
+    .limit(limit)
+    .select('-contributionCalendar -recentRepos');
+};
+
+// Instance methods
+userSchema.methods.updateRank = async function(category = 'totalCommits') {
+  const rank = await this.constructor.countDocuments({
+    [category]: { $gt: this[category] },
+    isActive: true,
+    accountType: { $ne: 'Organization' },
+  }) + 1;
+  
+  this.globalRank = rank;
+  return rank;
+};
+
+userSchema.methods.toPublicJSON = function() {
+  const obj = this.toObject({ virtuals: true });
+  
+  // Provide compatibility aliases
+  obj.login = obj.username;
+  obj.currentStreak = obj.contributionStreak || 0;
+  
+  // Remove sensitive information
+  delete obj.email;
+  delete obj.__v;
+  
+  return obj;
+};
+
+module.exports = mongoose.model('User', userSchema);

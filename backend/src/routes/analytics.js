@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] analytics.js
+// [Commity Core Phase 2: Logic] analytics.js
 const express = require('express');
 const router = express.Router();
 
@@ -47,6 +47,16 @@ router.get('/summary',
 );
 
 /**
+ * @route   GET /api/analytics/platform/stats
+ * @route   GET /api/platform/stats
+ * @desc    Get live platform statistics
+ * @access  Public
+ */
+router.get('/platform/stats',
+  AnalyticsController.getPlatformStats
+);
+
+/**
  * @route   GET /api/analytics/insights
  * @desc    Get platform insights and comprehensive analytics
  * @access  Public
@@ -62,40 +72,3 @@ router.get('/insights',
  * @access  Public
  */
 router.get('/trends',
-  validateAnalyticsQuery,
-  validateDateRange,
-  AnalyticsController.getAnalyticsTrends
-);
-
-/**
- * @route   GET /api/analytics/compare
- * @route   POST /api/analytics/compare
- * @desc    Compare multiple users' analytics
- * @access  Public
- */
-router.get('/compare',
-  validateAnalyticsQuery,
-  validateDateRange,
-  AnalyticsController.compareUsers
-);
-
-router.post('/compare',
-  validateAnalyticsQuery,
-  validateDateRange,
-  AnalyticsController.compareUsers
-);
-
-/**
- * @route   GET /api/analytics/user/:username
- * @desc    Get detailed analytics for a specific user
- * @access  Public
- */
-router.get('/user/:username',
-  validateGitHubUsername,
-  validateAnalyticsQuery,
-  validateDateRange,
-  optionalAuth,
-  AnalyticsController.getUserAnalytics
-);
-
-module.exports = router;

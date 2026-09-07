@@ -66,11 +66,11 @@ class AnalyticsService {
         additions: 0,
         deletions: 0,
         contributions: {
-          commits: githubData.commits || 0,
-          pullRequests: githubData.pullRequests || 0,
-          issues: githubData.issues || 0,
-          reviews: githubData.reviews || 0,
-          total: (githubData.commits || 0) + (githubData.pullRequests || 0) + (githubData.issues || 0) + (githubData.reviews || 0),
+          commits: commits || 0,
+          pullRequests: pullRequests || 0,
+          issues: issues || 0,
+          reviews: reviews || 0,
+          total: (commits || 0) + (pullRequests || 0) + (issues || 0) + (reviews || 0),
         },
       };
 
@@ -400,7 +400,7 @@ class AnalyticsService {
               { 
                 $match: { 
                   isActive: true,
-                  location: { $exists: true, $ne: null, $ne: '' }
+                  location: { $exists: true, $nin: [null, ''] }
                 }
               },
               {

@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] syncWorker.js
+// [Commity Core Phase 2: Logic] syncWorker.js
 const cron = require('node-cron');
 const User = require('../models/User');
 const UserService = require('./userService');
@@ -57,9 +57,10 @@ class SyncWorker {
     try {
       const staleThreshold = new Date(Date.now() - (this.syncIntervalDays * 24 * 60 * 60 * 1000));
 
-      // Find all users who haven't been synchronized within the last 7 days
+      // Find all users who haven't been synchronized within the last 7 days (excluding Organizations)
       const staleUsers = await User.find({
         isActive: true,
+        accountType: { $ne: 'Organization' },
         $or: [
           { lastFetchedAt: { $lt: staleThreshold } },
           { lastFetchedAt: null },
@@ -88,59 +89,11 @@ class SyncWorker {
       const durationSec = Math.round((Date.now() - startTime) / 1000);
       logger.info(`✅ SyncWorker cycle finished in ${durationSec}s: ${updatedCount} updated, ${errorCount} errors`);
 
-      // Sync top 256 developers for key regional directories (Pakistan, etc.) from committers.top
+      // Generate authentic regional snapshot for Pakistan using direct GitHub GraphQL
       try {
-        const CommittersService = require('./committersService');
-        await CommittersService.syncRegion('pakistan', 'Pakistan');
-      } catch (committersErr) {
-        logger.warn(`CommittersService weekly sync warning: ${committersErr.message}`);
+        const GitHubRankingService = require('./githubRankingService');
+        await GitHubRankingService.generateRegionalRanking('Pakistan', { candidateLimit: 30, topQuota: 256 });
+      } catch (rankingErr) {
+        logger.warn(`Regional ranking generation warning: ${rankingErr.message}`);
       }
 
-      // Run automated geographic discovery for active developers across key regions
-      await this.runWeeklyCrawl();
-
-    } catch (error) {
-      logger.error('Error during SyncWorker weekly cycle:', error.message);
-    } finally {
-      this.isRunning = false;
-    }
-  }
-
-  /**
-   * Automatically discover and crawl new active developers from key regions using GitHub API
-   */
-  async runWeeklyCrawl() {
-    const keyRegions = ['Pakistan', 'USA', 'Germany', 'France', 'Japan', 'United Kingdom', 'Canada', 'India', 'Singapore'];
-    const GitHubService = require('./githubService');
-    const githubService = new GitHubService();
-
-    logger.info('🌐 SyncWorker running automated geographic GitHub API crawling...');
-    for (const region of keyRegions) {
-      try {
-        const searchRes = await githubService.searchUsers(`location:"${region}"`, {
-          sort: 'followers',
-          order: 'desc',
-          per_page: 10
-        });
-
-        if (searchRes && searchRes.users) {
-          for (const u of searchRes.users.slice(0, 5)) {
-            try {
-              const existing = await User.findOne({ username: u.username.toLowerCase() });
-              if (!existing || !this.userService.isRecentlyUpdated(existing)) {
-                await this.userService.syncUserProfile(u.username, false);
-                await Helpers.sleep(300);
-              }
-            } catch (err) {
-              logger.warn(`Failed weekly sync for @${u.username}: ${err.message}`);
-            }
-          }
-        }
-      } catch (err) {
-        logger.warn(`Weekly crawl notice for ${region}: ${err.message}`);
-      }
-    }
-  }
-}
-
-module.exports = new SyncWorker();

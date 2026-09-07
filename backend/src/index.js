@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] index.js
+// [Commity Core Phase 2: Logic] index.js
 // Load environment variables first
 require('dotenv').config();
 console.log('✅ Environment variables loaded');
@@ -68,6 +68,7 @@ app.get('/health', (req, res) => {
 app.use('/api/users', userRoutes);
 app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.get('/api/platform/stats', require('./controllers/analyticsController').getPlatformStats);
 
 // Handle 404 routes
 app.use('*', notFound);
@@ -89,49 +90,3 @@ const shutdown = async (signal) => {
       } catch (err) {
         logger.error('Error closing MongoDB connection:', err);
       }
-      process.exit(0);
-    });
-  } else {
-    try {
-      await mongoose.connection.close();
-    } catch (e) {}
-    process.exit(0);
-  }
-};
-
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-
-app.close = async () => {
-  if (server) {
-    await new Promise((resolve) => server.close(resolve));
-  }
-  await mongoose.connection.close();
-};
-
-// Start server when run directly
-if (require.main === module) {
-  connectDB()
-    .then(() => {
-      server = app.listen(PORT, () => {
-        logger.info(`🚀 Server running on port ${PORT}`);
-        logger.info(`📊 GitHub Analytics Tool API ready`);
-        logger.info(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-        
-        // Start background snapshot sync worker (7-day cadence)
-        const syncWorker = require('./services/syncWorker');
-        syncWorker.start();
-      });
-    })
-    .catch((err) => {
-      logger.error('Failed to connect to database on startup:', err);
-      process.exit(1);
-    });
-} else {
-  // Imported by tests: connect without crashing
-  connectDB().catch((err) => {
-    logger.warn('Database connection warning in test environment:', err.message);
-  });
-}
-
-module.exports = app;

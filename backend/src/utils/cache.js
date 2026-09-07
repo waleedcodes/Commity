@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] cache.js
 const NodeCache = require('node-cache');
 const logger = require('./logger');
 const { CACHE_KEYS, TIME } = require('../config/constants');
@@ -273,3 +272,141 @@ class CacheManager {
     }
   }
   
+  /**
+   * Set TTL for existing cache entry
+   * @param {string} cacheType - Type of cache (from CACHE_KEYS)
+   * @param {string} key - Cache key
+   * @param {number} ttl - TTL in seconds
+   * @returns {boolean} Success status
+   */
+  static ttl(cacheType, key, ttl) {
+    try {
+      const cache = caches[cacheType];
+      if (!cache) {
+        return false;
+      }
+      
+      return cache.ttl(key, ttl);
+    } catch (error) {
+      logger.error(`Error setting TTL for cache ${cacheType}:${key}:`, error.message);
+      return false;
+    }
+  }
+  
+  /**
+   * Generate cache key with prefix
+   * @param {string} prefix - Key prefix
+   * @param {string|number} identifier - Unique identifier
+   * @param {string} suffix - Optional suffix
+   * @returns {string} Generated cache key
+   */
+  static generateKey(prefix, identifier, suffix = '') {
+    const key = `${prefix}:${identifier}${suffix ? `:${suffix}` : ''}`;
+    return key.toLowerCase().replace(/[^a-z0-9:_-]/g, '_');
+  }
+  
+  /**
+   * Cache wrapper function - get from cache or execute function and cache result
+   * @param {string} cacheType - Type of cache
+   * @param {string} key - Cache key
+   * @param {Function} fn - Function to execute if cache miss
+   * @param {number} ttl - Optional TTL in seconds
+   * @returns {Promise<any>} Cached or computed value
+   */
+  static async getOrSet(cacheType, key, fn, ttl = null) {
+    const redisKey = `${cacheType}:${key}`;
+    const effectiveTtl = ttl || (cacheConfigs[cacheType] && cacheConfigs[cacheType].stdTTL) || 300;
+
+    // 1. Check Redis if ready
+    if (redisClient && redisClient.status === 'ready') {
+      try {
+        const cachedRedis = await redisClient.get(redisKey);
+        if (cachedRedis !== null) {
+          logger.debug(`Redis Cache HIT: ${redisKey}`);
+          return JSON.parse(cachedRedis);
+        }
+      } catch (rErr) {
+        logger.warn(`Redis GET failed (${rErr.message}), falling back to memory/fn`);
+      }
+    }
+
+    // 2. Try in-memory cache
+    try {
+      const memoryValue = this.get(cacheType, key);
+      if (memoryValue !== null) {
+        logger.debug(`Cache HIT: ${cacheType}:${key}`);
+        return memoryValue;
+      }
+    } catch (memErr) {
+      logger.warn(`Memory cache GET error: ${memErr.message}`);
+    }
+
+    // 3. Cache miss - execute function directly
+    logger.debug(`Cache MISS: ${cacheType}:${key} - executing function`);
+    const value = await fn();
+
+    // 4. Cache the result in memory and Redis (non-blocking errors)
+    if (value !== null && value !== undefined) {
+      try {
+        this.set(cacheType, key, value, ttl);
+      } catch (setErr) {
+        logger.warn(`Cache SET error ${cacheType}:${key}: ${setErr.message}`);
+      }
+
+      if (redisClient && redisClient.status === 'ready') {
+        try {
+          await redisClient.set(redisKey, JSON.stringify(value), 'EX', effectiveTtl);
+        } catch (rSetErr) {
+          logger.warn(`Redis SET failed (${rSetErr.message})`);
+        }
+      }
+    }
+
+    return value;
+  }
+  
+  /**
+   * Get overall cache health status
+   * @returns {object} Cache health information
+   */
+  static getHealthStatus() {
+    const status = {
+      healthy: true,
+      caches: {},
+      totalKeys: 0,
+      totalHits: 0,
+      totalMisses: 0,
+    };
+    
+    try {
+      Object.keys(caches).forEach(cacheType => {
+        const stats = this.getStats(cacheType);
+        const keys = this.keys(cacheType);
+        
+        status.caches[cacheType] = {
+          keys: keys.length,
+          stats: stats,
+        };
+        
+        status.totalKeys += keys.length;
+        if (stats) {
+          status.totalHits += stats.hits;
+          status.totalMisses += stats.misses;
+        }
+      });
+      
+      status.hitRate = status.totalHits + status.totalMisses > 0 
+        ? (status.totalHits / (status.totalHits + status.totalMisses) * 100).toFixed(2) + '%'
+        : '0%';
+        
+    } catch (error) {
+      logger.error('Error getting cache health status:', error.message);
+      status.healthy = false;
+      status.error = error.message;
+    }
+    
+    return status;
+  }
+}
+
+module.exports = CacheManager;

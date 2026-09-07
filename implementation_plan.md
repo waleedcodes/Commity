@@ -37,3 +37,43 @@ graph TD
     H -->|/api/platform/stats| I[Frontend Hero Statistics]
     H -->|/api/regions| J[Frontend Country Explorer]
     H -->|/api/leaderboard/featured| K[Frontend Featured Developers]
+```
+
+---
+
+## 2. Proposed Changes
+
+### Phase 1: Kill Fake Data & Update User Schema
+#### [MODIFY] [User.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/models/User.js)
+- Add verification metadata fields:
+  - `contributionSource`: `{ type: String, enum: ['github_graphql', 'github_rest', 'unverified'], default: 'github_graphql' }`
+  - `dataQuality`: `{ type: String, enum: ['verified', 'estimated', 'unverified'], default: 'verified' }`
+  - `statsUpdatedAt`: `{ type: Date, default: Date.now }`
+- Remove all fallback calculations that invent numbers when fields are missing (store actual numbers or 0/null).
+
+---
+
+### Phase 2: Build Real `GitHubRankingService` & Sunset HTML Scraping
+#### [NEW] [rankingSnapshot.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/models/RankingSnapshot.js)
+- Mongoose model for immutable ranking snapshots:
+  - `region`: String (e.g. `'Pakistan'`, `'United States'`)
+  - `regionKey`: String (e.g. `'pakistan'`, `'usa'`)
+  - `generatedAt`: Date
+  - `totalUsersFound`: Number (from GitHub search total_count)
+  - `minimumFollowers`: Number (lowest follower count among ranked candidates)
+  - `candidatesConsidered`: Number
+  - `usersRanked`: Number
+  - `rankings`: Array of `{ rank, username, name, avatarUrl, contributions, commits, pullRequests, issues, reviews, followers }`
+
+#### [NEW] [githubRankingService.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/services/githubRankingService.js)
+- Replaces HTML-scraping `committersService.js`:
+  - `discoverCandidates(region, maxCandidates = 100)`: Uses GitHub REST `/search/users?q=location:"${region}" type:user&sort=followers`.
+  - `fetchCandidateContributions(candidates)`: Uses GitHub GraphQL query requesting real contribution collections (`totalCommitContributions`, `totalPullRequestContributions`, `totalIssueContributions`, `totalPullRequestReviewContributions`, `restrictedContributionsCount`, `totalContributions`).
+  - `generateRegionalRanking(region, options)`: Discovers candidates, queries real GraphQL metrics, sorts candidates by `totalContributions` descending, upserts verified `User` documents, and persists a `RankingSnapshot`.
+
+#### [MODIFY] [committersService.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/services/committersService.js)
+- Delegate `syncRegion()` to `githubRankingService.js` so any existing callers seamlessly use the authentic GraphQL pipeline without HTML scraping or fake multipliers.
+
+#### [MODIFY] [syncWorker.js](file:///Users/mc/CODING/GITHUB/WORKING%20REPO/Commity/backend/src/services/syncWorker.js)
+- Call `GitHubRankingService.generateRegionalRanking('Pakistan')` during scheduled sync cycles.
+

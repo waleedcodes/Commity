@@ -90,7 +90,7 @@ class AnalyticsController {
             { 
               $match: { 
                 isActive: true,
-                location: { $exists: true, $ne: null, $ne: '' }
+                location: { $exists: true, $nin: [null, ''] }
               }
             },
             {
@@ -287,10 +287,13 @@ class AnalyticsController {
 
         // Get user's analytics records
         let userAnalytics = await Analytics.find({
-          $or: [{ username: user.username }, { githubUsername: user.username }],
-          $or: [
-            { date: { $gte: dateRange.start, $lte: dateRange.end } },
-            { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+          $and: [
+            { $or: [{ username: user.username }, { githubUsername: user.username }] },
+            { $or: [
+                { date: { $gte: dateRange.start, $lte: dateRange.end } },
+                { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+              ]
+            }
           ]
         }).sort({ date: 1, startDate: 1 });
 
@@ -751,10 +754,13 @@ class AnalyticsController {
         const userAnalytics = {};
         for (const user of users) {
           let analytics = await Analytics.find({
-            $or: [{ username: user.username }, { githubUsername: user.username }],
-            $or: [
-              { date: { $gte: dateRange.start, $lte: dateRange.end } },
-              { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+            $and: [
+              { $or: [{ username: user.username }, { githubUsername: user.username }] },
+              { $or: [
+                  { date: { $gte: dateRange.start, $lte: dateRange.end } },
+                  { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+                ]
+              }
             ]
           }).sort({ date: 1, startDate: 1 });
 

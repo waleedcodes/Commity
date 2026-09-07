@@ -763,7 +763,7 @@ class LeaderboardController {
       async () => {
         // Aggregate distinct active regions from MongoDB
         const regionAggregation = await User.aggregate([
-          { $match: { isActive: true, accountType: { $ne: 'Organization' }, location: { $exists: true, $ne: null, $ne: '' } } },
+          { $match: { isActive: true, accountType: { $ne: 'Organization' }, location: { $exists: true, $nin: [null, ''] } } },
           { $group: { _id: '$location', count: { $sum: 1 }, totalContributions: { $sum: '$totalContributions' } } },
           { $sort: { count: -1 } },
           { $limit: 30 }

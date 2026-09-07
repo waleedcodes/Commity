@@ -1,7 +1,8 @@
-// [Commity Core Phase 1: Setup] leaderboardController.js
+// [Commity Core Phase 2: Logic] leaderboardController.js
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ErrorFactory } = require('../middleware/errorHandler');
 const User = require('../models/User');
+const RankingSnapshot = require('../models/RankingSnapshot');
 const Analytics = require('../models/Analytics');
 const logger = require('../utils/logger');
 const Helpers = require('../utils/helpers');
@@ -35,8 +36,8 @@ class LeaderboardController {
       CACHE_KEYS.LEADERBOARD,
       cacheKey,
       async () => {
-        // Build query based on category
-        const query = { isActive: true };
+        // Build query based on category (strictly individual developers)
+        const query = { isActive: true, accountType: { $ne: 'Organization' } };
         
         if (location) {
           query.location = { $regex: location, $options: 'i' };
@@ -86,15 +87,16 @@ class LeaderboardController {
               const userService = new UserService();
 
               logger.info(`🔍 Live discovering active GitHub developers for location: ${location}`);
-              const searchRes = await githubService.searchUsers(`location:"${location}"`, {
+              const searchRes = await githubService.searchUsers(`location:"${location}" type:user`, {
                 sort: 'followers',
                 order: 'desc',
                 per_page: 15
               });
 
               if (searchRes && searchRes.users) {
+                const individualDevelopers = searchRes.users.filter(u => u.type !== 'Organization');
                 // Sync top 5 developers concurrently for ultra-fast first-time response
-                const fastBatch = searchRes.users.slice(0, 5);
+                const fastBatch = individualDevelopers.slice(0, 5);
                 await Promise.allSettled(
                   fastBatch.map(async (u) => {
                     const existing = await User.findOne({ username: u.username.toLowerCase() });
@@ -105,7 +107,7 @@ class LeaderboardController {
                 );
 
                 // Crawl and sync the next batch in the background
-                const nextBatch = searchRes.users.slice(5, 15);
+                const nextBatch = individualDevelopers.slice(5, 15);
                 (async () => {
                   for (const u of nextBatch) {
                     try {
@@ -355,6 +357,7 @@ class LeaderboardController {
 
         const topUsers = await User.find({ 
           isActive: true,
+          accountType: { $ne: 'Organization' },
           [sortField]: { $gt: 0 }
         })
         .sort({ [sortField]: -1 })
@@ -556,105 +559,3 @@ class LeaderboardController {
       const rank = await User.countDocuments({
         [field]: { $gt: user[field] },
         isActive: true,
-      }) + 1;
-
-      const total = await User.countDocuments({ isActive: true });
-      const percentile = Math.round((1 - (rank - 1) / total) * 100);
-
-      rankings[category.trim()] = {
-        rank,
-        total,
-        percentile,
-        value: user[field] || 0,
-        category: category.trim(),
-      };
-    }
-
-    // Get user's position in location-based leaderboard if location exists
-    if (user.location) {
-      const locationRank = await User.countDocuments({
-        totalCommits: { $gt: user.totalCommits },
-        location: { $regex: user.location, $options: 'i' },
-        isActive: true,
-      }) + 1;
-
-      const locationTotal = await User.countDocuments({
-        location: { $regex: user.location, $options: 'i' },
-        isActive: true,
-      });
-
-      rankings.location = {
-        rank: locationRank,
-        total: locationTotal,
-        percentile: Math.round((1 - (locationRank - 1) / locationTotal) * 100),
-        value: user.totalCommits,
-        category: 'location',
-        locationName: user.location,
-      };
-    }
-
-    res.json({
-      success: true,
-      data: {
-        user: {
-          username: user.username,
-          name: user.name,
-          avatarUrl: user.avatarUrl,
-          location: user.location,
-        },
-        rankings,
-        overallScore: this._calculateOverallScore(rankings),
-      },
-      timestamp: new Date().toISOString(),
-    });
-  });
-
-  /**
-   * Calculate contributor score
-   * @private
-   */
-  static _calculateContributorScore(user) {
-    const weights = {
-      commits: 1,
-      pullRequests: 3,
-      issues: 2,
-      reviews: 2,
-      followers: 0.1,
-    };
-
-    return Math.round(
-      (user.totalCommits || 0) * weights.commits +
-      (user.totalPullRequests || 0) * weights.pullRequests +
-      (user.totalIssues || 0) * weights.issues +
-      (user.totalReviews || 0) * weights.reviews +
-      (user.followers || 0) * weights.followers
-    );
-  }
-
-  /**
-   * Calculate overall score from rankings
-   * @private
-   */
-  static _calculateOverallScore(rankings) {
-    const weights = {
-      commits: 0.3,
-      followers: 0.2,
-      repositories: 0.2,
-      contributions: 0.3,
-    };
-
-    let totalScore = 0;
-    let totalWeight = 0;
-
-    Object.entries(rankings).forEach(([category, data]) => {
-      if (weights[category] && data.percentile) {
-        totalScore += data.percentile * weights[category];
-        totalWeight += weights[category];
-      }
-    });
-
-    return totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0;
-  }
-}
-
-module.exports = LeaderboardController;

@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] analytics.js
 const express = require('express');
 const router = express.Router();
 
@@ -72,3 +71,40 @@ router.get('/insights',
  * @access  Public
  */
 router.get('/trends',
+  validateAnalyticsQuery,
+  validateDateRange,
+  AnalyticsController.getAnalyticsTrends
+);
+
+/**
+ * @route   GET /api/analytics/compare
+ * @route   POST /api/analytics/compare
+ * @desc    Compare multiple users' analytics
+ * @access  Public
+ */
+router.get('/compare',
+  validateAnalyticsQuery,
+  validateDateRange,
+  AnalyticsController.compareUsers
+);
+
+router.post('/compare',
+  validateAnalyticsQuery,
+  validateDateRange,
+  AnalyticsController.compareUsers
+);
+
+/**
+ * @route   GET /api/analytics/user/:username
+ * @desc    Get detailed analytics for a specific user
+ * @access  Public
+ */
+router.get('/user/:username',
+  validateGitHubUsername,
+  validateAnalyticsQuery,
+  validateDateRange,
+  optionalAuth,
+  AnalyticsController.getUserAnalytics
+);
+
+module.exports = router;

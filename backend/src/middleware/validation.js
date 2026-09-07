@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] validation.js
 const Joi = require('joi');
 const { ErrorFactory } = require('./errorHandler');
 const { REGEX, PAGINATION, ANALYTICS_PERIODS } = require('../config/constants');

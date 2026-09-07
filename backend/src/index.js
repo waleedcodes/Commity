@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] index.js
 // Load environment variables first
 require('dotenv').config();
 console.log('✅ Environment variables loaded');

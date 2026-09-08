@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] committersService.js
 const https = require('https');
 const User = require('../models/User');
 const GitHubRankingService = require('./githubRankingService');
@@ -61,3 +60,35 @@ class CommittersService {
           }
         }
         if (Array.isArray(official.user)) {
+          for (let i = 0; i < official.user.length; i++) {
+            await User.updateOne(
+              { username: official.user[i].toLowerCase() },
+              { $set: { countryRankCommits: i + 1 } }
+            );
+          }
+        }
+        logger.info(`✅ [CommittersService] Successfully updated 3-category ranks for ${countryName}`);
+      }
+
+      const snapshot = await GitHubRankingService.generateRegionalRanking(countryName, {
+        regionKey: countryKey,
+        candidateLimit: 30,
+        topQuota: 256,
+      });
+
+      return {
+        country: countryName,
+        totalUsersInRegion: snapshot.totalUsersFound,
+        minFollowers: snapshot.minimumFollowers,
+        generatedAt: snapshot.generatedAt.toISOString(),
+        totalIndexed: snapshot.usersRanked,
+        dataSource: snapshot.dataSource,
+      };
+    } catch (error) {
+      logger.error(`[CommittersService] Error syncing region '${countryName}':`, error.message);
+      throw error;
+    }
+  }
+}
+
+module.exports = CommittersService;

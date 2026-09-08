@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] page.js
+// [Commity Core Phase 2: Logic] page.js
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
@@ -24,10 +24,10 @@ import { formatNumber, formatRelativeTime, getLanguageColor } from '../utils/hel
 
 export default function Dashboard() {
   const [overview, setOverview] = useState({
-    totalUsers: 12,
+    totalUsers: 256,
     totalRepositories: 3375,
-    totalCommits: 67710,
-    activeUsers: 12,
+    totalCommits: 958611,
+    activeUsers: 256,
   });
   const [topContributors, setTopContributors] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -59,22 +59,31 @@ export default function Dashboard() {
   const fetchDashboardData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // 1. Fetch Global Analytics & Overview
-      const [globalRes, summaryRes, leaderboardRes, activityRes] = await Promise.allSettled([
+      // 1. Fetch Platform Stats, Global Analytics & Overview
+      const [platformStatsRes, globalRes, summaryRes, leaderboardRes, activityRes] = await Promise.allSettled([
+        apiService.get('/platform/stats'),
         apiService.get('/analytics/global'),
         apiService.get('/analytics/summary'),
         apiService.get('/leaderboard', { limit: 5, category: 'contributions' }),
         apiService.get(`/users/${activityUser}/activity`)
       ]);
 
-      // Set overview stats
-      if (globalRes.status === 'fulfilled' && globalRes.value?.data?.overview) {
+      // Set overview stats from platform stats or fallback
+      if (platformStatsRes.status === 'fulfilled' && platformStatsRes.value?.data) {
+        const ps = platformStatsRes.value.data;
+        setOverview((prev) => ({
+          totalUsers: ps.totalUsers || ps.indexedDevelopers || prev.totalUsers,
+          totalRepositories: ps.totalRepositories || prev.totalRepositories,
+          totalCommits: ps.totalContributions || ps.totalCommits || prev.totalCommits,
+          activeUsers: ps.indexedDevelopers || ps.totalUsers || prev.activeUsers,
+        }));
+      } else if (globalRes.status === 'fulfilled' && globalRes.value?.data?.overview) {
         const ov = globalRes.value.data.overview;
         setOverview({
-          totalUsers: ov.totalUsers || 12,
+          totalUsers: ov.totalUsers || 256,
           totalRepositories: ov.totalRepositories || 3375,
-          totalCommits: ov.totalCommits || 67710,
-          activeUsers: ov.activeUsers || 12,
+          totalCommits: ov.totalCommits || 958611,
+          activeUsers: ov.activeUsers || 256,
         });
 
         // Set distributions if available
@@ -89,10 +98,10 @@ export default function Dashboard() {
       } else if (summaryRes.status === 'fulfilled' && summaryRes.value?.data) {
         const sum = summaryRes.value.data;
         setOverview({
-          totalUsers: sum.totalUsers || 12,
+          totalUsers: sum.totalUsers || 256,
           totalRepositories: sum.totalRepositories || 3375,
-          totalCommits: sum.totalContributions || sum.totalCommits || 67710,
-          activeUsers: sum.totalContributors || 12,
+          totalCommits: sum.totalContributions || sum.totalCommits || 958611,
+          activeUsers: sum.totalContributors || 256,
         });
       }
 
@@ -361,189 +370,3 @@ export default function Dashboard() {
                         <span className="text-sm font-bold text-slate-900 dark:text-white">
                           {formatNumber(total)}
                         </span>
-                        <p className="text-[11px] text-slate-400">contributions</p>
-                      </div>
-                    </Link>
-                  );
-                })
-              ) : (
-                <div className="p-8 text-center text-slate-500 text-sm">
-                  No contributors found. Run seeder or sync users.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Right Column: Real GitHub Live Activity (5 Cols) */}
-          <div className="lg:col-span-5 space-y-6">
-            
-            {/* Live Activity Feed */}
-            <Card className="border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs">
-              <CardHeader className="flex flex-col gap-3 pb-4 border-b border-slate-100 dark:border-slate-800/80">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2.5">
-                    <div className="p-1.5 rounded-md bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400">
-                      <Activity className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base font-bold text-slate-900 dark:text-white">
-                        Live GitHub Events
-                      </CardTitle>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Real-time commits, pushes, and events
-                      </p>
-                    </div>
-                  </div>
-                  {activityLoading && (
-                    <RotateCw className="w-3.5 h-3.5 animate-spin text-blue-500" />
-                  )}
-                </div>
-
-                {/* Contributor switcher pills */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
-                  <span className="text-[11px] font-medium text-slate-400 mr-1">Developer:</span>
-                  {['waleedcodes', 'sufiyanshahiddev', 'torvalds', 'antfu'].map((u) => (
-                    <button
-                      key={u}
-                      type="button"
-                      onClick={() => handleSwitchActivityUser(u)}
-                      className={`text-[11px] px-2 py-0.5 rounded-full font-mono transition-colors ${
-                        activityUser === u
-                          ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                      @{u}
-                    </button>
-                  ))}
-                </div>
-              </CardHeader>
-
-              <CardContent className="p-4 space-y-3.5">
-                {isLoading || activityLoading ? (
-                  <div className="space-y-3">
-                    {[...Array(4)].map((_, i) => (
-                      <div key={i} className="flex items-start space-x-3 animate-pulse">
-                        <div className="w-2.5 h-2.5 rounded-full bg-slate-200 dark:bg-slate-700 mt-1"></div>
-                        <div className="flex-1 space-y-1">
-                          <div className="h-3.5 bg-slate-200 dark:bg-slate-700 rounded w-4/5"></div>
-                          <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/3"></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : recentActivity.length > 0 ? (
-                  recentActivity.map((event, i) => {
-                    const type = event.type;
-                    const repoName = event.repo?.name || event.repository || 'repository';
-                    const time = formatRelativeTime(event.created_at || new Date());
-                    const commitMsg = event.payload?.commits?.[0]?.message;
-
-                    return (
-                      <div key={event.id || i} className="flex items-start space-x-3 text-xs">
-                        <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-slate-800 dark:text-slate-200">
-                            {type === 'PushEvent' ? 'Pushed commits to' :
-                             type === 'WatchEvent' ? 'Starred repository' :
-                             type === 'CreateEvent' ? 'Created repository/branch' :
-                             type === 'PullRequestEvent' ? 'Opened pull request on' :
-                             'Contributed to'}{' '}
-                            <span className="font-semibold text-blue-600 dark:text-blue-400 truncate">
-                              {repoName}
-                            </span>
-                          </p>
-                          {commitMsg && (
-                            <p className="text-slate-500 dark:text-slate-400 truncate mt-0.5 text-[11px] font-mono bg-slate-100 dark:bg-slate-800/60 p-1 rounded">
-                              &ldquo;{commitMsg}&rdquo;
-                            </p>
-                          )}
-                          <span className="text-[11px] text-slate-400 mt-0.5 inline-block">
-                            {time}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="space-y-3 text-xs">
-                    <div className="flex items-start space-x-3">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5 shrink-0"></span>
-                      <div>
-                        <p className="font-medium text-slate-800 dark:text-slate-200">
-                          Full database sync completed for 12 developer profiles
-                        </p>
-                        <span className="text-[11px] text-slate-400">Just now</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <span className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 shrink-0"></span>
-                      <div>
-                        <p className="font-medium text-slate-800 dark:text-slate-200">
-                          GraphQL contribution heatmaps indexed for active contributors
-                        </p>
-                        <span className="text-[11px] text-slate-400">5 minutes ago</span>
-                      </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                      <span className="w-2 h-2 rounded-full bg-purple-500 mt-1.5 shrink-0"></span>
-                      <div>
-                        <p className="font-medium text-slate-800 dark:text-slate-200">
-                          Leaderboard rankings recalculated across 30-day metrics
-                        </p>
-                        <span className="text-[11px] text-slate-400">12 minutes ago</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Top Languages Distribution */}
-            {topLanguages.length > 0 && (
-              <Card className="border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs">
-                <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800/80">
-                  <div className="flex items-center space-x-2">
-                    <Code2 className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                    <CardTitle className="text-sm font-bold text-slate-900 dark:text-white">
-                      Community Language Share
-                    </CardTitle>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3">
-                  {topLanguages.map((lang) => (
-                    <div key={lang.name} className="space-y-1">
-                      <div className="flex justify-between text-xs font-medium">
-                        <span className="flex items-center space-x-1.5">
-                          <span 
-                            className="w-2 h-2 rounded-full" 
-                            style={{ backgroundColor: getLanguageColor(lang.name) }} 
-                          />
-                          <span>{lang.name}</span>
-                        </span>
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {lang.userCount} devs ({lang.averageUsage}%)
-                        </span>
-                      </div>
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-500" 
-                          style={{ 
-                            width: `${Math.min(100, Math.max(5, lang.averageUsage))}%`,
-                            backgroundColor: getLanguageColor(lang.name) 
-                          }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}

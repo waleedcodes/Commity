@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] syncWorker.js
+// [Commity Core Phase 2: Logic] syncWorker.js
 const cron = require('node-cron');
 const User = require('../models/User');
 const UserService = require('./userService');
@@ -15,9 +15,9 @@ class SyncWorker {
 
   /**
    * Start the background cron schedule
-   * Defaults to running every day at 03:00 AM to refresh any profiles older than 7 days
+   * Defaults to running every Monday at 02:00 AM UTC (matching committers.top weekly snapshot release)
    */
-  start(cronExpression = '0 3 * * *') {
+  start(cronExpression = process.env.UPDATE_SCHEDULE || '0 2 * * 1') {
     if (this.cronTask) {
       logger.warn('SyncWorker cron task is already scheduled');
       return;
@@ -26,7 +26,7 @@ class SyncWorker {
     logger.info(`⏰ Initializing SyncWorker background scheduler [Cadence: ${this.syncIntervalDays}-day weekly snapshot, Cron: ${cronExpression}]`);
 
     this.cronTask = cron.schedule(cronExpression, async () => {
-      logger.info('🔄 Scheduled weekly snapshot sync triggered by cron');
+      logger.info('🔄 Scheduled Monday weekly snapshot sync triggered by cron');
       await this.runWeeklySync();
     });
   }
@@ -93,56 +93,7 @@ class SyncWorker {
       try {
         const GitHubRankingService = require('./githubRankingService');
         await GitHubRankingService.generateRegionalRanking('Pakistan', { candidateLimit: 30, topQuota: 256 });
+        await User.recalculateRegionalRanks('pakistan');
       } catch (rankingErr) {
         logger.warn(`Regional ranking generation warning: ${rankingErr.message}`);
       }
-
-      // Run automated geographic discovery for active developers across key regions
-      await this.runWeeklyCrawl();
-
-    } catch (error) {
-      logger.error('Error during SyncWorker weekly cycle:', error.message);
-    } finally {
-      this.isRunning = false;
-    }
-  }
-
-  /**
-   * Automatically discover and crawl new active developers from key regions using GitHub API
-   */
-  async runWeeklyCrawl() {
-    const keyRegions = ['Pakistan', 'USA', 'Germany', 'France', 'Japan', 'United Kingdom', 'Canada', 'India', 'Singapore'];
-    const GitHubService = require('./githubService');
-    const githubService = new GitHubService();
-
-    logger.info('🌐 SyncWorker running automated geographic GitHub API crawling for individual developers...');
-    for (const region of keyRegions) {
-      try {
-        const searchRes = await githubService.searchUsers(`location:"${region}" type:user`, {
-          sort: 'followers',
-          order: 'desc',
-          per_page: 10
-        });
-
-        if (searchRes && searchRes.users) {
-          const individualDevelopers = searchRes.users.filter(u => u.type !== 'Organization');
-          for (const u of individualDevelopers.slice(0, 5)) {
-            try {
-              const existing = await User.findOne({ username: u.username.toLowerCase() });
-              if (!existing || !this.userService.isRecentlyUpdated(existing)) {
-                await this.userService.syncUserProfile(u.username, false);
-                await Helpers.sleep(300);
-              }
-            } catch (err) {
-              logger.warn(`Failed weekly sync for @${u.username}: ${err.message}`);
-            }
-          }
-        }
-      } catch (err) {
-        logger.warn(`Weekly crawl notice for ${region}: ${err.message}`);
-      }
-    }
-  }
-}
-
-module.exports = new SyncWorker();

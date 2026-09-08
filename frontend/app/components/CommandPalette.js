@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] CommandPalette.js
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';
@@ -293,3 +292,151 @@ export default function CommandPalette({ isOpen, onClose, onToggleDarkMode }) {
           )}
 
           {/* Quick Developers Section */}
+          {filteredDevs.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-1 flex items-center gap-1">
+                <Users className="w-3 h-3 text-blue-500" /> Developers & Maintainers
+              </p>
+              <div className="space-y-0.5">
+                {filteredDevs.map((dev) => {
+                  const itemIndex = flatItems.findIndex(i => i.id === `dev-${dev.username}`);
+                  const isSelected = selectedIndex === itemIndex;
+
+                  return (
+                    <button
+                      key={dev.username}
+                      type="button"
+                      onClick={() => {
+                        router.push(`/profile/${dev.username}`);
+                        onClose();
+                      }}
+                      onMouseEnter={() => setSelectedIndex(itemIndex)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar className="w-8 h-8 rounded-lg shrink-0 border border-slate-200 dark:border-slate-700">
+                          <AvatarImage src={dev.avatar} alt={dev.username} />
+                          <AvatarFallback className="text-xs">{dev.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 truncate">
+                          <p className="text-sm font-semibold truncate leading-tight">{dev.name}</p>
+                          <p className={`text-xs truncate leading-tight ${isSelected ? 'text-blue-100' : 'text-slate-400'}`}>
+                            @{dev.username} • {dev.role}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`text-[11px] font-mono font-medium px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                        isSelected 
+                          ? 'bg-white/20 text-white' 
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}>
+                        {dev.badge}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Pages Section */}
+          {filteredNav.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-1 flex items-center gap-1">
+                <Command className="w-3 h-3 text-purple-500" /> Platform Navigation
+              </p>
+              <div className="space-y-0.5">
+                {filteredNav.map((item) => {
+                  const Icon = item.icon;
+                  const itemIndex = flatItems.findIndex(i => i.id === `nav-${item.href}`);
+                  const isSelected = selectedIndex === itemIndex;
+
+                  return (
+                    <button
+                      key={item.href}
+                      type="button"
+                      onClick={() => {
+                        router.push(item.href);
+                        onClose();
+                      }}
+                      onMouseEnter={() => setSelectedIndex(itemIndex)}
+                      className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition ${
+                        isSelected
+                          ? 'bg-purple-600 text-white shadow-xs'
+                          : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${isSelected ? 'bg-white/20 text-white' : 'bg-purple-500/10 text-purple-500'}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{item.name}</p>
+                          <p className={`text-xs ${isSelected ? 'text-purple-100' : 'text-slate-400'}`}>{item.desc}</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="w-4 h-4 opacity-50 shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Quick Actions Section */}
+          <div>
+            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider px-3 mb-1 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-amber-500" /> Quick Actions & Duels
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 px-1">
+              {quickActions.map((action) => {
+                const Icon = action.icon;
+                const itemIndex = flatItems.findIndex(i => i.id === action.id);
+                const isSelected = selectedIndex === itemIndex;
+
+                return (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={action.action}
+                    onMouseEnter={() => setSelectedIndex(itemIndex)}
+                    className={`flex items-center gap-2.5 p-2.5 rounded-xl text-left text-xs font-medium transition ${
+                      isSelected
+                        ? 'bg-amber-500 text-slate-950 font-bold shadow-xs'
+                        : 'border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4 shrink-0 text-amber-500" />
+                    <span className="truncate">{copiedAction && action.id === 'copy-profile' ? 'Copied to Clipboard!' : action.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Footer info bar */}
+        <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/80 flex items-center justify-between text-xs text-slate-400">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-mono border border-slate-300 dark:border-slate-700">↑</kbd>
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-mono border border-slate-300 dark:border-slate-700">↓</kbd>
+              <span>to navigate</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[10px] font-mono border border-slate-300 dark:border-slate-700">↵</kbd>
+              <span>to select</span>
+            </span>
+          </div>
+          <span className="font-mono text-[11px] text-blue-500">Commity Spotlight</span>
+        </div>
+
+      </div>
+    </div>
+  );
+}

@@ -249,3 +249,35 @@ export const useTrendingUsers = () => {
     refetch: fetchTrendingUsers
   };
 };
+
+export const useRegions = () => {
+  const [regions, setRegions] = useState([]);
+  const [loading, setLoading] = useState(LOADING_STATES.IDLE);
+  const [error, setError] = useState(null);
+
+  const fetchRegions = useCallback(async () => {
+    setLoading(LOADING_STATES.LOADING);
+    setError(null);
+
+    try {
+      const response = await leaderboardService.getRegions();
+      const list = Array.isArray(response?.data) ? response.data : [];
+      setRegions(list);
+      setLoading(LOADING_STATES.SUCCESS);
+    } catch (err) {
+      setError(err.message);
+      setLoading(LOADING_STATES.ERROR);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRegions();
+  }, [fetchRegions]);
+
+  return {
+    regions,
+    loading: loading === LOADING_STATES.LOADING,
+    error,
+    refetch: fetchRegions,
+  };
+};

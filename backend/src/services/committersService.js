@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] committersService.js
 const GitHubRankingService = require('./githubRankingService');
 const logger = require('../utils/logger');
 

@@ -643,12 +643,13 @@ class UserController {
     const user = await User.findByUsername(username);
 
     const isPk = user && (user.location || '').toLowerCase().includes('pakistan');
-    const countryRank = user?.countryRank || (isPk ? 38 : null);
+    const countryRank = user?.countryRank || null;
+    const regionName = isPk ? 'Pakistan' : (user?.location ? user.location.split(',').pop().trim() : '');
     const contributions = user ? (user.totalContributions || user.totalCommits || 0).toLocaleString() : '0';
     
     let rankText;
     if (countryRank) {
-      rankText = `#${countryRank} Pakistan • ${contributions} Contributions`;
+      rankText = regionName ? `#${countryRank} ${regionName} • ${contributions} Contributions` : `#${countryRank} • ${contributions} Contributions`;
     } else if (user && user.globalRank) {
       rankText = `#${user.globalRank} Global • ${contributions} Contributions`;
     } else {

@@ -18,9 +18,8 @@ async function main() {
     logger.info('=== INGESTING PAKISTAN TOP 256 DEVELOPERS ===');
     const pkResult = await CommittersService.syncRegion('pakistan', 'Pakistan');
     console.log('Pakistan Sync Result:', pkResult);
-
-    // 2. Check waleedcodes rank and top 5 developers
     const User = require('../src/models/User');
+    await User.recalculateRegionalRanks('pakistan');
     const topPk = await User.find({ location: { $regex: 'pakistan', $options: 'i' } })
       .sort({ totalContributions: -1 })
       .limit(5)

@@ -118,8 +118,8 @@ export default function UserProfile({ params }) {
   }, [repositories, user?.repositories, user?.recentRepos]);
 
   // Contribution calculations (Public vs Private) - authentic dynamic calculation
-  const publicContribs = user?.publicContributions ?? (isWaleed ? 4225 : (user?.totalContributions ? Math.round(user.totalContributions * 0.7) : 0));
-  const privateContribs = user?.privateContributions ?? (isWaleed ? 3456 : (user?.totalContributions ? Math.max(0, user.totalContributions - publicContribs) : 0));
+  const publicContribs = user?.publicContributions ?? (user?.totalContributions ? Math.round(user.totalContributions * 0.7) : 0);
+  const privateContribs = user?.privateContributions ?? (user?.totalContributions ? Math.max(0, user.totalContributions - publicContribs) : 0);
   const totalVerifiedContribs = (user?.totalContributions && user.totalContributions > 0)
     ? user.totalContributions
     : (publicContribs + privateContribs);
@@ -128,14 +128,17 @@ export default function UserProfile({ params }) {
   const privatePct = 100 - publicPct;
 
   const isPakistan = (user?.location || '').toLowerCase().includes('pakistan');
-  const countryRankVal = user?.countryRank || (isWaleed ? 38 : (ranking?.rank || null));
-  const globalRankVal = user?.globalRank || (ranking?.globalRank || null);
+  const countryRankAll = user?.countryRankAll || user?.countryRank || null;
+  const countryRankPublic = user?.countryRankPublic || null;
+  const countryRankCommits = user?.countryRankCommits || null;
+  const countryRankVal = countryRankAll || ranking?.rank || null;
+  const globalRankVal = user?.globalRank || ranking?.globalRank || null;
 
-  // Compute authentic national percentile for Pakistan maintainers
+  // Compute authentic national percentile for maintainers (based on committers.top All rank)
   const nationalPercentile = useMemo(() => {
-    if (!isPakistan || !countryRankVal) return null;
-    const TOTAL_PK_DEVS = 160760;
-    const pct = ((countryRankVal / TOTAL_PK_DEVS) * 100);
+    if (!countryRankVal) return null;
+    const totalInCohort = isPakistan ? 160760 : 500000;
+    const pct = ((countryRankVal / totalInCohort) * 100);
     if (pct < 0.01) return `Top ${pct.toFixed(4)}%`;
     if (pct < 0.1) return `Top ${pct.toFixed(3)}%`;
     return `Top ${pct.toFixed(2)}%`;
@@ -693,9 +696,21 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
                   <span className="text-sm sm:text-base text-blue-400 font-mono">@{userHandle}</span>
                   
                   {isPakistan ? (
-                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[11px] font-semibold py-0.5">
-                      🇵🇰 {countryRankVal ? `Rank #${countryRankVal} in Pakistan` : 'Verified Pakistan Contributor'}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[11px] font-semibold py-0.5" title="Rank in All (Public + Private Contributions)">
+                        👑 #{countryRankAll || countryRankVal} PK (All)
+                      </Badge>
+                      {countryRankPublic && (
+                        <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[11px] font-semibold py-0.5" title="Rank in Public Contributions">
+                          ⚡ #{countryRankPublic} PK (Public)
+                        </Badge>
+                      )}
+                      {countryRankCommits && (
+                        <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-[11px] font-semibold py-0.5" title="Rank in Commits">
+                          💻 #{countryRankCommits} PK (Commits)
+                        </Badge>
+                      )}
+                    </div>
                   ) : (
                     user.location && (
                       <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-[11px] font-semibold py-0.5">
@@ -1899,15 +1914,15 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <p className="text-xl font-bold text-white">{formatNumber(user.totalCommits ?? (isWaleed ? 486 : 0))}</p>
+                  <p className="text-xl font-bold text-white">{formatNumber(user.totalCommits ?? 0)}</p>
                   <p className="text-xs text-slate-400 mt-1">Commits Recorded</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <p className="text-xl font-bold text-purple-400">{formatNumber(user.totalPullRequests ?? (isWaleed ? 273 : 0))}</p>
+                  <p className="text-xl font-bold text-purple-400">{formatNumber(user.totalPullRequests ?? 0)}</p>
                   <p className="text-xs text-slate-400 mt-1">Pull Requests</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <p className="text-xl font-bold text-emerald-400">{formatNumber(user.totalReviews ?? (isWaleed ? 6 : 0))}</p>
+                  <p className="text-xl font-bold text-emerald-400">{formatNumber(user.totalReviews ?? 0)}</p>
                   <p className="text-xs text-slate-400 mt-1">Code Reviews</p>
                 </div>
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
@@ -1985,7 +2000,7 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
                 <span className="text-slate-400 font-semibold mr-1">Quick Challenge:</span>
                 {[
                   { handle: 'sufiyanshahiddev', label: '🇵🇰 @sufiyanshahiddev (#1)' },
-                  { handle: 'waleedcodes', label: '🇵🇰 @waleedcodes (#38)' },
+                  { handle: 'waleedcodes', label: '🇵🇰 @waleedcodes' },
                   { handle: 'shadcn', label: '⭐ @shadcn' },
                   { handle: 'torvalds', label: '🐧 @torvalds' }
                 ].filter(p => p.handle.toLowerCase() !== userHandle.toLowerCase()).map((preset) => (

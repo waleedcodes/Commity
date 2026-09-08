@@ -782,7 +782,7 @@ export default function StreakStudio({ initialUser = 'waleedcodes', initialCompa
             <div className="flex flex-wrap items-center gap-2 pt-1 text-xs">
               <span className="text-slate-400 font-medium">Quick matchups:</span>
               {[
-                { a: 'waleedcodes', b: 'sufiyanshahiddev', label: 'Waleed (#38) vs Sufiyan (#1 PK)' },
+                { a: 'waleedcodes', b: 'sufiyanshahiddev', label: 'Waleed vs Sufiyan (#1 PK)' },
                 { a: 'waleedcodes', b: 'torvalds', label: 'Waleed vs Linus Torvalds' },
                 { a: 'antfu', b: 'sindresorhus', label: 'Anthony Fu vs Sindre Sorhus' }
               ].map((m) => (

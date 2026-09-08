@@ -23,10 +23,10 @@ import { formatNumber, formatRelativeTime, getLanguageColor } from '../utils/hel
 
 export default function Dashboard() {
   const [overview, setOverview] = useState({
-    totalUsers: 12,
+    totalUsers: 256,
     totalRepositories: 3375,
-    totalCommits: 67710,
-    activeUsers: 12,
+    totalCommits: 958611,
+    activeUsers: 256,
   });
   const [topContributors, setTopContributors] = useState([]);
   const [recentActivity, setRecentActivity] = useState([]);
@@ -58,22 +58,31 @@ export default function Dashboard() {
   const fetchDashboardData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // 1. Fetch Global Analytics & Overview
-      const [globalRes, summaryRes, leaderboardRes, activityRes] = await Promise.allSettled([
+      // 1. Fetch Platform Stats, Global Analytics & Overview
+      const [platformStatsRes, globalRes, summaryRes, leaderboardRes, activityRes] = await Promise.allSettled([
+        apiService.get('/platform/stats'),
         apiService.get('/analytics/global'),
         apiService.get('/analytics/summary'),
         apiService.get('/leaderboard', { limit: 5, category: 'contributions' }),
         apiService.get(`/users/${activityUser}/activity`)
       ]);
 
-      // Set overview stats
-      if (globalRes.status === 'fulfilled' && globalRes.value?.data?.overview) {
+      // Set overview stats from platform stats or fallback
+      if (platformStatsRes.status === 'fulfilled' && platformStatsRes.value?.data) {
+        const ps = platformStatsRes.value.data;
+        setOverview((prev) => ({
+          totalUsers: ps.totalUsers || ps.indexedDevelopers || prev.totalUsers,
+          totalRepositories: ps.totalRepositories || prev.totalRepositories,
+          totalCommits: ps.totalContributions || ps.totalCommits || prev.totalCommits,
+          activeUsers: ps.indexedDevelopers || ps.totalUsers || prev.activeUsers,
+        }));
+      } else if (globalRes.status === 'fulfilled' && globalRes.value?.data?.overview) {
         const ov = globalRes.value.data.overview;
         setOverview({
-          totalUsers: ov.totalUsers || 12,
+          totalUsers: ov.totalUsers || 256,
           totalRepositories: ov.totalRepositories || 3375,
-          totalCommits: ov.totalCommits || 67710,
-          activeUsers: ov.activeUsers || 12,
+          totalCommits: ov.totalCommits || 958611,
+          activeUsers: ov.activeUsers || 256,
         });
 
         // Set distributions if available
@@ -88,10 +97,10 @@ export default function Dashboard() {
       } else if (summaryRes.status === 'fulfilled' && summaryRes.value?.data) {
         const sum = summaryRes.value.data;
         setOverview({
-          totalUsers: sum.totalUsers || 12,
+          totalUsers: sum.totalUsers || 256,
           totalRepositories: sum.totalRepositories || 3375,
-          totalCommits: sum.totalContributions || sum.totalCommits || 67710,
-          activeUsers: sum.totalContributors || 12,
+          totalCommits: sum.totalContributions || sum.totalCommits || 958611,
+          activeUsers: sum.totalContributors || 256,
         });
       }
 

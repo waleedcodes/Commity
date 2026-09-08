@@ -14,9 +14,9 @@ class SyncWorker {
 
   /**
    * Start the background cron schedule
-   * Defaults to running every day at 03:00 AM to refresh any profiles older than 7 days
+   * Defaults to running every Monday at 02:00 AM UTC (matching committers.top weekly snapshot release)
    */
-  start(cronExpression = '0 3 * * *') {
+  start(cronExpression = process.env.UPDATE_SCHEDULE || '0 2 * * 1') {
     if (this.cronTask) {
       logger.warn('SyncWorker cron task is already scheduled');
       return;
@@ -25,7 +25,7 @@ class SyncWorker {
     logger.info(`⏰ Initializing SyncWorker background scheduler [Cadence: ${this.syncIntervalDays}-day weekly snapshot, Cron: ${cronExpression}]`);
 
     this.cronTask = cron.schedule(cronExpression, async () => {
-      logger.info('🔄 Scheduled weekly snapshot sync triggered by cron');
+      logger.info('🔄 Scheduled Monday weekly snapshot sync triggered by cron');
       await this.runWeeklySync();
     });
   }
@@ -92,6 +92,7 @@ class SyncWorker {
       try {
         const GitHubRankingService = require('./githubRankingService');
         await GitHubRankingService.generateRegionalRanking('Pakistan', { candidateLimit: 30, topQuota: 256 });
+        await User.recalculateRegionalRanks('pakistan');
       } catch (rankingErr) {
         logger.warn(`Regional ranking generation warning: ${rankingErr.message}`);
       }

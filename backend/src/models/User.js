@@ -175,7 +175,10 @@ const userSchema = new mongoose.Schema({
     type: Number,
     index: true,
   },
-  countryRank: Number,
+  countryRank: Number, // Primary rank (defaults to countryRankAll)
+  countryRankAll: Number, // Rank in All (Public + Private contributions)
+  countryRankPublic: Number, // Rank in Contributions (Public only)
+  countryRankCommits: Number, // Rank in Commits only
   cityRank: Number,
   
   // Last data fetch & analytics
@@ -337,15 +340,49 @@ userSchema.statics.getLeaderboard = function(category = 'totalCommits', limit = 
     .select('-contributionCalendar -recentRepos');
 };
 
+userSchema.statics.recalculateRegionalRanks = async function(region = 'pakistan') {
+  const users = await this.find({
+    location: { $regex: region, $options: 'i' },
+    isActive: true,
+    accountType: { $ne: 'Organization' },
+  }).sort({ totalContributions: -1, followers: -1 });
+
+  for (let i = 0; i < users.length; i++) {
+    const rank = i + 1;
+    if (users[i].countryRank !== rank) {
+      users[i].countryRank = rank;
+      await users[i].save();
+    }
+  }
+  return users.length;
+};
+
 // Instance methods
-userSchema.methods.updateRank = async function(category = 'totalCommits') {
+userSchema.methods.updateRank = async function(category = 'totalContributions') {
+  const sortVal = this[category] || 0;
   const rank = await this.constructor.countDocuments({
-    [category]: { $gt: this[category] },
+    [category]: { $gt: sortVal },
     isActive: true,
     accountType: { $ne: 'Organization' },
   }) + 1;
   
   this.globalRank = rank;
+
+  if (this.countryRankAll) {
+    this.countryRank = this.countryRankAll;
+  } else if (this.location && !this.countryRank) {
+    const locParts = this.location.split(',').map(s => s.trim());
+    const regionName = locParts[locParts.length - 1] || this.location;
+    const countryRank = await this.constructor.countDocuments({
+      [category]: { $gt: sortVal },
+      location: { $regex: regionName, $options: 'i' },
+      isActive: true,
+      accountType: { $ne: 'Organization' },
+    }) + 1;
+    this.countryRank = countryRank;
+  }
+
+  await this.save();
   return rank;
 };
 
@@ -355,6 +392,10 @@ userSchema.methods.toPublicJSON = function() {
   // Provide compatibility aliases
   obj.login = obj.username;
   obj.currentStreak = obj.contributionStreak || 0;
+  obj.countryRank = this.countryRank || this.countryRankAll || null;
+  obj.countryRankAll = this.countryRankAll || this.countryRank || null;
+  obj.countryRankPublic = this.countryRankPublic || null;
+  obj.countryRankCommits = this.countryRankCommits || null;
   
   // Remove sensitive information
   delete obj.email;

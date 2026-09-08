@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/Avatar';
 import { Input } from '../components/ui/Input';
-import { useLeaderboard, useLeaderboardStats } from '../hooks/useLeaderboard';
+import { useLeaderboard, useLeaderboardStats, useRegions } from '../hooks/useLeaderboard';
 import { formatNumber } from '../utils/helpers';
 import { LEADERBOARD_CATEGORIES, LEADERBOARD_TIMEFRAMES } from '../utils/constants';
 import { 
@@ -177,6 +177,29 @@ export default function Leaderboard() {
   });
   
   const { stats, loading: statsLoading, refetch: refetchStats } = useLeaderboardStats();
+  const { regions: dynamicRegions } = useRegions();
+
+  const countryOptions = useMemo(() => {
+    if (!dynamicRegions || dynamicRegions.length === 0) return POPULAR_COUNTRIES;
+    return dynamicRegions.map((r) => ({
+      id: r.query || r.name,
+      label: r.name,
+      flag: r.flag || '🌍',
+      indexedMaintainers: r.indexedMaintainers,
+      totalUsersFound: r.totalUsersFound,
+      minimumFollowers: r.minimumFollowers,
+    }));
+  }, [dynamicRegions]);
+
+  const matchedRegion = useMemo(() => {
+    if (!dynamicRegions || !selectedLocation) return null;
+    return dynamicRegions.find(
+      (r) =>
+        (r.query && r.query.toLowerCase() === selectedLocation.toLowerCase()) ||
+        (r.name && r.name.toLowerCase() === selectedLocation.toLowerCase()) ||
+        (r.id && r.id.toLowerCase() === selectedLocation.toLowerCase())
+    );
+  }, [dynamicRegions, selectedLocation]);
 
   const handleLaunchDuel = (targetUsername, e) => {
     if (e) {
@@ -270,14 +293,30 @@ export default function Leaderboard() {
     window.scrollTo({ top: 400, behavior: 'smooth' });
   };
 
-  const currentScale = REGIONAL_DEVELOPER_SCALE[selectedLocation] || {
-    regionName: selectedLocation,
-    totalUsers: regionSummary?.totalInRegion ? formatNumber(regionSummary.totalInRegion) : '160,760',
-    totalUsersLabel: `GitHub Users in ${selectedLocation}`,
-    indexedQuota: 'Top 256 Ranked Maintainers',
-    minFollowers: `${regionSummary?.minFollowers || 69}+ Followers Required`,
-    desc: `Active maintainers directory in ${selectedLocation}.`,
-  };
+  const currentScale = useMemo(() => {
+    if (matchedRegion) {
+      return {
+        regionName: matchedRegion.name,
+        totalUsers: matchedRegion.totalUsersFound
+          ? formatNumber(matchedRegion.totalUsersFound)
+          : regionSummary?.totalInRegion
+          ? formatNumber(regionSummary.totalInRegion)
+          : '100,000+',
+        totalUsersLabel: `GitHub Users in ${matchedRegion.name}`,
+        indexedQuota: `Top ${matchedRegion.indexedMaintainers || 256} Ranked Maintainers`,
+        minFollowers: `${matchedRegion.minimumFollowers || regionSummary?.minFollowers || 10}+ Followers Threshold`,
+        desc: `Candidate discovery by follower cohort, ranked by authentic 365-day GraphQL contributions in ${matchedRegion.name}.`,
+      };
+    }
+    return REGIONAL_DEVELOPER_SCALE[selectedLocation] || {
+      regionName: selectedLocation === 'all' ? 'Worldwide' : selectedLocation,
+      totalUsers: regionSummary?.totalInRegion ? formatNumber(regionSummary.totalInRegion) : '100,000,000+',
+      totalUsersLabel: `GitHub Users in ${selectedLocation === 'all' ? 'Worldwide' : selectedLocation}`,
+      indexedQuota: 'Top 256 Ranked Maintainers',
+      minFollowers: `${regionSummary?.minFollowers || 50}+ Followers Threshold`,
+      desc: `Active maintainers directory in ${selectedLocation === 'all' ? 'Worldwide' : selectedLocation}.`,
+    };
+  }, [matchedRegion, selectedLocation, regionSummary]);
 
   const handleRefreshAll = () => {
     refetch();
@@ -465,7 +504,7 @@ export default function Leaderboard() {
           <div className="p-4 rounded-2xl bg-slate-800/70 border border-indigo-500/30 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-lg shadow-indigo-950/20">
             <div className="flex items-center gap-3">
               <span className="text-3xl p-1.5 rounded-xl bg-slate-900 border border-slate-700">
-                {POPULAR_COUNTRIES.find(c => c.id === selectedLocation)?.flag || '📍'}
+                {matchedRegion?.flag || countryOptions.find(c => c.id === selectedLocation)?.flag || '📍'}
               </span>
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -763,7 +802,7 @@ export default function Leaderboard() {
                 <Globe className="w-3.5 h-3.5 text-cyan-400" /> Filter by Country / Region
               </p>
               <div className="flex flex-wrap gap-2">
-                {POPULAR_COUNTRIES.map((c) => (
+                {countryOptions.map((c) => (
                   <Button
                     key={c.id}
                     variant={selectedLocation === c.id ? "default" : "outline"}
@@ -776,7 +815,12 @@ export default function Leaderboard() {
                     }
                   >
                     <span className="mr-1.5">{c.flag}</span>
-                    {c.label}
+                    <span>{c.label}</span>
+                    {c.indexedMaintainers > 0 && (
+                      <span className="ml-1.5 text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                        {c.indexedMaintainers}
+                      </span>
+                    )}
                   </Button>
                 ))}
               </div>
@@ -871,7 +915,7 @@ export default function Leaderboard() {
                             <span className="text-xs text-slate-400 font-mono">@{username}</span>
                             {isWaleed && (
                               <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] py-0 font-semibold">
-                                ★ Featured Maintainer (#38 PK)
+                                ★ Featured Maintainer
                               </Badge>
                             )}
                             {user.location && (

@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] leaderboardService.js
 import { apiService } from './api';
 
 class LeaderboardService {

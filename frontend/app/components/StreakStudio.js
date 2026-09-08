@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] StreakStudio.js
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';

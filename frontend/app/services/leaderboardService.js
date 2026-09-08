@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] leaderboardService.js
+// [Commity Core Phase 2: Logic] leaderboardService.js
 import { apiService } from './api';
 
 class LeaderboardService {
@@ -55,17 +55,3 @@ class LeaderboardService {
   // Get trending users
   async getTrendingUsers(params = {}) {
     return apiService.get('/leaderboard/trending', params);
-  }
-
-  // Get recent activity leaders
-  async getRecentActivityLeaders(params = {}) {
-    return apiService.get('/leaderboard/recent-activity', params);
-  }
-
-  // Get leaderboard filters/categories
-  async getLeaderboardFilters() {
-    return apiService.get('/leaderboard/filters');
-  }
-}
-
-export const leaderboardService = new LeaderboardService();

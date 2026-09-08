@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] userController.js
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ErrorFactory } = require('../middleware/errorHandler');
 const GitHubService = require('../services/githubService');

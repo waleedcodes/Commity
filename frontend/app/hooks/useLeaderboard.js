@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] useLeaderboard.js
+// [Commity Core Phase 2: Logic] useLeaderboard.js
 import { useState, useEffect, useCallback } from 'react';
 import { leaderboardService } from '../services/leaderboardService';
 import { LOADING_STATES } from '../utils/constants';
@@ -187,66 +187,3 @@ export const useLanguageLeaderboard = (language) => {
   const [error, setError] = useState(null);
 
   const fetchLanguageLeaderboard = useCallback(async (extraParams = {}) => {
-    if (!language) return;
-
-    setLoading(LOADING_STATES.LOADING);
-    setError(null);
-
-    try {
-      const response = await leaderboardService.getLanguageLeaderboard(language, extraParams);
-      const list = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data?.users || []);
-      setLeaderboard(list);
-      setLoading(LOADING_STATES.SUCCESS);
-    } catch (err) {
-      setError(err.message);
-      setLoading(LOADING_STATES.ERROR);
-    }
-  }, [language]);
-
-  useEffect(() => {
-    fetchLanguageLeaderboard();
-  }, [fetchLanguageLeaderboard]);
-
-  return {
-    leaderboard,
-    loading: loading === LOADING_STATES.LOADING,
-    error,
-    refetch: fetchLanguageLeaderboard
-  };
-};
-
-export const useTrendingUsers = () => {
-  const [trendingUsers, setTrendingUsers] = useState([]);
-  const [loading, setLoading] = useState(LOADING_STATES.IDLE);
-  const [error, setError] = useState(null);
-
-  const fetchTrendingUsers = useCallback(async (extraParams = {}) => {
-    setLoading(LOADING_STATES.LOADING);
-    setError(null);
-
-    try {
-      const response = await leaderboardService.getTrendingUsers(extraParams);
-      const list = Array.isArray(response.data) 
-        ? response.data 
-        : (response.data?.users || []);
-      setTrendingUsers(list);
-      setLoading(LOADING_STATES.SUCCESS);
-    } catch (err) {
-      setError(err.message);
-      setLoading(LOADING_STATES.ERROR);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTrendingUsers();
-  }, [fetchTrendingUsers]);
-
-  return {
-    trendingUsers,
-    loading: loading === LOADING_STATES.LOADING,
-    error,
-    refetch: fetchTrendingUsers
-  };
-};

@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] page.js
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -849,3 +848,429 @@ export default function Home() {
                 <span>Fetching {currentRegion.name} rankings...</span>
               </div>
             ) : countryUsers.length > 0 ? (
+              <div className="space-y-3">
+                {/* Country scale indicator banner */}
+                <div className="p-3.5 rounded-xl bg-slate-800/70 border border-slate-700/70 flex items-center justify-between gap-3 text-xs mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl">{currentRegion.flag || '🌍'}</span>
+                    <span className="text-slate-300 leading-relaxed">
+                      {currentRegion.totalUsersFound 
+                        ? `${formatNumber(currentRegion.totalUsersFound)}+ active developers in ${currentRegion.name}. Candidates discovered by follower cohort (min ${currentRegion.minimumFollowers || 10} followers), verified & ranked by genuine 365-day GraphQL total contributions.`
+                        : `Verified open-source contributors in ${currentRegion.name} ranked by true 365-day GraphQL contributions (commits, pull requests, and reviews).`}
+                    </span>
+                  </div>
+                  <Link 
+                    href={`/leaderboard?location=${currentRegion.query || ''}`}
+                    className="text-blue-400 hover:text-blue-300 font-semibold shrink-0"
+                  >
+                    View All 256 &rarr;
+                  </Link>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-400 pb-2 border-b border-slate-800 font-semibold uppercase">
+                  <span>{currentRegion.name} Developer</span>
+                  <div className="flex items-center gap-6">
+                    <span className="hidden sm:inline">Location</span>
+                    <span>Contributions</span>
+                  </div>
+                </div>
+
+                {countryUsers.map((user, idx) => (
+                  <Link
+                    key={user.username || idx}
+                    href={`/profile/${user.username}`}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-800/40 hover:bg-slate-800/80 border border-slate-800/80 hover:border-blue-500/40 transition-all group"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-7 h-7 rounded-lg font-bold text-xs flex items-center justify-center ${
+                        idx === 0 ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        #{idx + 1}
+                      </div>
+                      <Avatar className="w-9 h-9 border border-slate-700">
+                        <AvatarImage src={user.avatarUrl} alt={user.username} />
+                        <AvatarFallback>{user.username[0].toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h4 className="text-sm font-bold text-white group-hover:text-blue-400 transition-colors">
+                            {user.name || user.username}
+                          </h4>
+                          {idx === 0 && (
+                            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[10px] py-0">
+                              #1 {currentRegion.name}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400">@{user.username}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      <span className="hidden sm:inline text-xs text-slate-400">{user.location || 'Local'}</span>
+                      <div className="text-right">
+                        <span className="text-sm font-extrabold text-blue-400 block font-mono">
+                          {formatNumber(user.totalContributions || user.totalCommits || 0)}
+                        </span>
+                        <span className="text-[10px] text-slate-400">{user.publicRepos || 0} repos</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              // Default fallback for countries with few seeded developers
+              <div className="p-6 text-center">
+                <p className="text-sm text-slate-400 mb-4">
+                  No cached profiles indexed yet for {currentRegion.name}.
+                </p>
+                <Link
+                  href={`/profile/${currentRegion.highlight || 'waleedcodes'}`}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold"
+                >
+                  <span>Explore Featured Profile: @{currentRegion.highlight || 'waleedcodes'}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 5. INTERACTIVE README BADGE GENERATOR (Direct on Home Page) */}
+        {/* ========================================================================= */}
+        <section id="readme-badge" className="py-16 border-t border-slate-800/80">
+          <div className="rounded-3xl p-8 sm:p-12 bg-gradient-to-r from-blue-950/60 via-indigo-950/50 to-slate-900 border border-blue-800/40 relative overflow-hidden shadow-2xl">
+            
+            {/* Ambient Corner Light */}
+            <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 blur-3xl pointer-events-none" />
+
+            <div className="relative z-10 max-w-3xl">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-xs font-semibold uppercase tracking-wider mb-4 border border-blue-400/30">
+                <ShieldCheck className="w-4 h-4" />
+                <span>GitHub Profile README Widget</span>
+              </div>
+
+              <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+                Embed Your Commity Rank In Your GitHub README
+              </h2>
+              <p className="text-slate-300 text-sm sm:text-base mt-2 leading-relaxed">
+                Showcase your verified open source ranking to recruiters and collaborators. Generates an auto-updating live SVG badge for your profile.
+              </p>
+
+              {/* Username Input */}
+              <div className="mt-8 flex flex-col sm:flex-row gap-3 items-center">
+                <div className="relative flex-1 w-full">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">@</span>
+                  <Input
+                    type="text"
+                    value={badgeUsername}
+                    onChange={(e) => setBadgeUsername(e.target.value)}
+                    placeholder="Enter GitHub username (e.g. waleedcodes)..."
+                    className="pl-8 bg-slate-900/90 border-slate-700 text-white h-11 text-sm rounded-xl"
+                  />
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <Button
+                    type="button"
+                    variant={badgeType === 'svg' ? 'default' : 'outline'}
+                    onClick={() => setBadgeType('svg')}
+                    className="h-11 px-4 text-xs font-semibold rounded-xl"
+                  >
+                    SVG Badge
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={badgeType === 'shields' ? 'default' : 'outline'}
+                    onClick={() => setBadgeType('shields')}
+                    className="h-11 px-4 text-xs font-semibold rounded-xl"
+                  >
+                    Shields.io
+                  </Button>
+                </div>
+              </div>
+
+              {/* Live Preview & Code Box */}
+              <div className="mt-6 p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">
+                    Live Badge Preview:
+                  </span>
+                  
+                  {/* Dynamic SVG Badge Rendering */}
+                  <div className="inline-flex items-center p-2 rounded-xl bg-slate-900 border border-slate-800">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img 
+                      src={`${API_BASE}/users/${badgeUsername.trim() || 'waleedcodes'}/badge.svg`}
+                      alt="Commity Rank Badge"
+                      className="h-7 w-auto"
+                      onError={(e) => {
+                        // Fallback shield in case backend is offline
+                        e.currentTarget.src = `https://img.shields.io/badge/Commity-%231%20Rank%20%E2%80%A2%204.2K%20Contribs-2563eb?style=for-the-badge&logo=github`;
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Markdown Code Snippet */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-mono text-slate-400">Copy Markdown to your README.md:</span>
+                    <button
+                      onClick={handleCopyBadge}
+                      className="text-xs font-semibold text-blue-400 hover:text-blue-300 inline-flex items-center gap-1 transition-colors"
+                    >
+                      {copiedBadge ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-400">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Markdown</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <pre className="p-3 rounded-xl bg-slate-900 border border-slate-800/80 font-mono text-xs text-blue-300 overflow-x-auto selection:bg-blue-500">
+                    {badgeMarkdown}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 6. HEAD-TO-HEAD DEVELOPER DUEL ARENA */}
+        {/* ========================================================================= */}
+        <section className="py-16 border-t border-slate-800/80">
+          <div className="rounded-3xl p-8 sm:p-12 bg-slate-900/70 border border-slate-800 relative overflow-hidden backdrop-blur-md">
+            
+            <div className="text-center max-w-2xl mx-auto mb-8">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold mb-2">
+                <Code2 className="w-3.5 h-3.5" />
+                <span>Developer Duel Engine</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Compare Any Two Contributors Side-by-Side
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                Benchmark contribution volumes, repository popularity, and programming languages between top open-source engineers.
+              </p>
+            </div>
+
+            {/* Duel Arena Form */}
+            <form onSubmit={handleCompare} className="max-w-3xl mx-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-center">
+                
+                {/* User 1 */}
+                <div className="sm:col-span-2">
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">@</span>
+                    <Input
+                      type="text"
+                      placeholder="User 1 (e.g. waleedcodes)"
+                      value={compareUser1}
+                      onChange={(e) => setCompareUser1(e.target.value)}
+                      className="pl-8 bg-slate-950/80 border-slate-700 text-white h-12 rounded-xl text-sm font-medium"
+                    />
+                  </div>
+                </div>
+
+                {/* VS Badge */}
+                <div className="sm:col-span-1 flex justify-center py-1">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-blue-600 text-white font-black text-xs flex items-center justify-center shadow-lg shadow-purple-600/30">
+                    VS
+                  </div>
+                </div>
+
+                {/* User 2 */}
+                <div className="sm:col-span-2">
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-mono text-sm">@</span>
+                    <Input
+                      type="text"
+                      placeholder="User 2 (e.g. torvalds)"
+                      value={compareUser2}
+                      onChange={(e) => setCompareUser2(e.target.value)}
+                      className="pl-8 bg-slate-950/80 border-slate-700 text-white h-12 rounded-xl text-sm font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <div className="mt-6 flex justify-center">
+                <Button 
+                  type="submit" 
+                  size="lg"
+                  className="h-12 px-8 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-purple-600/25 gap-2"
+                >
+                  <span>Launch Deep Comparison</span>
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Preset Quick Matches */}
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-400 uppercase mr-1">Trending Duels:</span>
+                {PRESET_DUELS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setCompareUser1(preset.u1);
+                      setCompareUser2(preset.u2);
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700/60 transition-colors"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </form>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 7. ARCHITECTURAL ADVANTAGES (Why Commity?) */}
+        {/* ========================================================================= */}
+        <section className="py-16 border-t border-slate-800/80">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-black text-white tracking-tight">
+              Engineered for Open-Source Scale
+            </h2>
+            <p className="text-sm text-slate-400 mt-2">
+              Combining the proven 7-day stability of committers.top with modern interactive developer analytics.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            {/* Feature 1 */}
+            <Card className="bg-slate-900/60 border-slate-800 p-6 space-y-3 hover:border-slate-700 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center">
+                <Clock className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-lg text-white">7-Day Weekly Snapshots</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Background cron workers pre-compute rankings and cache user snapshots in MongoDB Atlas, providing 0ms responses without hitting GitHub rate limits.
+              </p>
+              <Link href="/leaderboard" className="text-xs font-semibold text-blue-400 hover:underline inline-flex items-center gap-1 pt-1">
+                Explore Leaderboards &rarr;
+              </Link>
+            </Card>
+
+            {/* Feature 2 */}
+            <Card className="bg-slate-900/60 border-slate-800 p-6 space-y-3 hover:border-slate-700 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center">
+                <BarChart3 className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-lg text-white">365-Day GraphQL Truth</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                We pull the complete contribution calendar, counting all 4,000+ contributions (commits, PRs, issues, code reviews) rather than just default-branch commits.
+              </p>
+              <Link href="/analytics" className="text-xs font-semibold text-purple-400 hover:underline inline-flex items-center gap-1 pt-1">
+                View Global Analytics &rarr;
+              </Link>
+            </Card>
+
+            {/* Feature 3 */}
+            <Card className="bg-slate-900/60 border-slate-800 p-6 space-y-3 hover:border-slate-700 transition-all">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <h3 className="font-bold text-lg text-white">Dynamic README Badges</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Generate high-resolution SVG badges to embed in your GitHub profile README. Visitors see your national and global Commity ranking in real-time.
+              </p>
+              <a href="#readme-badge" className="text-xs font-semibold text-emerald-400 hover:underline inline-flex items-center gap-1 pt-1">
+                Generate Your Badge &rarr;
+              </a>
+            </Card>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 8. FREQUENTLY ASKED QUESTIONS */}
+        {/* ========================================================================= */}
+        <section className="py-16 border-t border-slate-800/80">
+          <div className="max-w-3xl mx-auto">
+            <div className="text-center mb-10">
+              <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                Frequently Asked Questions
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                Learn how Commity keeps open source metrics fast, accurate, and accessible.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {FAQS.map((faq, idx) => {
+                const isOpen = openFaq === idx;
+                return (
+                  <div
+                    key={idx}
+                    className="rounded-2xl bg-slate-900/60 border border-slate-800 overflow-hidden transition-all"
+                  >
+                    <button
+                      onClick={() => setOpenFaq(isOpen ? -1 : idx)}
+                      className="w-full p-4 sm:p-5 text-left font-semibold text-sm sm:text-base text-white flex items-center justify-between gap-4"
+                    >
+                      <span>{faq.q}</span>
+                      {isOpen ? (
+                        <ChevronUp className="w-4 h-4 text-blue-400 shrink-0" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+                      )}
+                    </button>
+                    {isOpen && (
+                      <div className="px-4 sm:px-5 pb-5 text-xs sm:text-sm text-slate-400 leading-relaxed border-t border-slate-800/60 pt-3">
+                        {faq.a}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* ========================================================================= */}
+        {/* 9. BOTTOM CALL TO ACTION */}
+        {/* ========================================================================= */}
+        <section className="py-16 mb-12">
+          <div className="rounded-3xl p-8 sm:p-12 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white text-center shadow-2xl relative overflow-hidden">
+            <div className="relative z-10 max-w-2xl mx-auto">
+              <h2 className="text-3xl sm:text-4xl font-black tracking-tight">
+                Start Tracking Your Open Source Impact
+              </h2>
+              <p className="text-blue-100 text-sm sm:text-base mt-2">
+                Join developers worldwide benchmarking their annual contributions and claiming their country ranks.
+              </p>
+
+              <form onSubmit={handleSearch} className="mt-8 flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+                <Input
+                  type="text"
+                  placeholder="Your GitHub username..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-12 bg-white/10 border-white/20 text-white placeholder:text-blue-200 text-sm rounded-xl"
+                />
+                <Button 
+                  type="submit" 
+                  className="h-12 px-6 bg-white hover:bg-slate-100 text-slate-900 font-bold rounded-xl shadow-lg shrink-0"
+                >
+                  Analyze Me
+                </Button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+  );
+}

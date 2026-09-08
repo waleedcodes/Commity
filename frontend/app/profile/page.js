@@ -262,6 +262,34 @@ export default function ProfileHub() {
   const [cityData, setCityData] = useState({});
   const [loadingCity, setLoadingCity] = useState(false);
 
+  // Dynamic featured maintainer profile state
+  const [featuredProfile, setFeaturedProfile] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+    fetch(`${API_URL}/users/waleedcodes`)
+      .then(r => r.json())
+      .then(json => {
+        if (!isMounted) return;
+        if (json.success && json.data) {
+          setFeaturedProfile(json.data.user || json.data);
+        }
+      })
+      .catch(() => {});
+    return () => { isMounted = false; };
+  }, []);
+
+  const featuredRank = featuredProfile?.countryRankAll || featuredProfile?.countryRank || null;
+  const featuredPublicRank = featuredProfile?.countryRankPublic || null;
+  const featuredCommitsRank = featuredProfile?.countryRankCommits || null;
+  const featuredPublic = featuredProfile?.publicContributions || 0;
+  const featuredPrivate = featuredProfile?.privateContributions || 0;
+  const featuredTotal = featuredProfile?.totalContributions || (featuredPublic + featuredPrivate);
+  const featuredFollowers = featuredProfile?.followers || 0;
+  const featuredPublicPct = featuredTotal > 0 ? Math.round((featuredPublic / featuredTotal) * 100) : 0;
+  const featuredPrivatePct = featuredTotal > 0 ? (100 - featuredPublicPct) : 0;
+
   // Fetch verified city maintainers dynamically when a city hub chip is clicked
   useEffect(() => {
     if (selectedCity === 'all') return;
@@ -732,7 +760,7 @@ export default function ProfileHub() {
                     <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="waleedcodes" />
                     <AvatarFallback>WI</AvatarFallback>
                   </Avatar>
-                  <span>@waleedcodes (#38)</span>
+                  <span>@waleedcodes</span>
                   <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                 </Button>
               </Link>
@@ -807,19 +835,33 @@ export default function ProfileHub() {
                   <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="waleedcodes" />
                   <AvatarFallback className="text-xl font-bold bg-slate-800 text-slate-200">WI</AvatarFallback>
                 </Avatar>
-                <div className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-lg flex items-center gap-1">
-                  👑 #38 PK
-                </div>
+                {featuredRank && (
+                  <div className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-lg flex items-center gap-1">
+                    👑 #{featuredRank} PK
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <h3 className="text-2xl font-black text-white">Waleed Ishfaq</h3>
-                  <span className="text-sm text-blue-400 font-mono">@waleedcodes</span>
-                  <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[11px] font-semibold py-0.5">
-                    ★ #38 Pakistan Maintainer
-                  </Badge>
-                  <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[11px] font-semibold py-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-2xl font-black text-white">{featuredProfile?.name || 'Waleed Ishfaq'}</h3>
+                  <span className="text-sm text-blue-400 font-mono">@{featuredProfile?.username || 'waleedcodes'}</span>
+                  {featuredRank && (
+                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[11px] font-semibold py-0.5">
+                      👑 #{featuredRank} PK (All)
+                    </Badge>
+                  )}
+                  {featuredPublicRank && (
+                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-[11px] font-semibold py-0.5">
+                      ⚡ #{featuredPublicRank} PK (Public)
+                    </Badge>
+                  )}
+                  {featuredCommitsRank && (
+                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/40 text-[11px] font-semibold py-0.5">
+                      💻 #{featuredCommitsRank} PK (Commits)
+                    </Badge>
+                  )}
+                  <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/40 text-[11px] font-semibold py-0.5">
                     📍 #1 in Abbottabad
                   </Badge>
                 </div>
@@ -827,17 +869,18 @@ export default function ProfileHub() {
                   Full-Stack Software Engineer • Abbottabad, Pakistan 🇵🇰
                 </p>
                 <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
-                  Top 0.02% ranked developer out of 160,760 in Pakistan. 4,225 public contributions + 3,456 private contributions (7,681 total verified GraphQL contributions). 86 followers (&ge; 69 threshold qualified).
+                  {featuredRank ? `Top ${(featuredRank / 160760 * 100).toFixed(3)}% ranked developer out of 160,760 in Pakistan. ` : ''}
+                  {featuredPublic.toLocaleString()} public contributions + {featuredPrivate.toLocaleString()} private contributions ({featuredTotal.toLocaleString()} total verified GraphQL contributions). {featuredFollowers} followers.
                 </p>
 
                 {/* Mini Ratio Bar */}
                 <div className="pt-2 flex items-center gap-3 text-[11px] max-w-md">
-                  <span className="text-emerald-400 font-mono">Public: 4,225 (55%)</span>
+                  <span className="text-emerald-400 font-mono">Public: {featuredPublic.toLocaleString()} ({featuredPublicPct}%)</span>
                   <div className="flex-1 h-2 rounded-full bg-slate-800 overflow-hidden flex">
-                    <div className="w-[55%] h-full bg-emerald-400" title="Public: 4,225" />
-                    <div className="w-[45%] h-full bg-purple-400" title="Private: 3,456" />
+                    <div className="h-full bg-emerald-400" style={{ width: `${featuredPublicPct}%` }} title={`Public: ${featuredPublic.toLocaleString()}`} />
+                    <div className="h-full bg-purple-400" style={{ width: `${featuredPrivatePct}%` }} title={`Private: ${featuredPrivate.toLocaleString()}`} />
                   </div>
-                  <span className="text-purple-400 font-mono">Private: 3,456 (45%)</span>
+                  <span className="text-purple-400 font-mono">Private: {featuredPrivate.toLocaleString()} ({featuredPrivatePct}%)</span>
                 </div>
               </div>
             </div>
@@ -845,11 +888,11 @@ export default function ProfileHub() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
               <div className="grid grid-cols-2 gap-2.5 text-center sm:text-right">
                 <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
-                  <p className="text-lg font-black text-white">4,225</p>
+                  <p className="text-lg font-black text-white">{featuredPublic.toLocaleString()}</p>
                   <p className="text-[10px] text-slate-400 uppercase tracking-wider">Public Contribs</p>
                 </div>
                 <div className="p-3 rounded-xl bg-slate-900/90 border border-slate-800">
-                  <p className="text-lg font-black text-amber-400">7,681</p>
+                  <p className="text-lg font-black text-amber-400">{featuredTotal.toLocaleString()}</p>
                   <p className="text-[10px] text-slate-400 uppercase tracking-wider">Total Verified</p>
                 </div>
               </div>
@@ -1523,7 +1566,7 @@ export default function ProfileHub() {
               <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
                 <span>Presets:</span>
                 {[
-                  { a: 'waleedcodes', b: 'sufiyanshahiddev', label: 'Waleed (#38) vs Sufiyan (#1)' },
+                  { a: 'waleedcodes', b: 'sufiyanshahiddev', label: 'Waleed vs Sufiyan (#1)' },
                   { a: 'waleedcodes', b: 'torvalds', label: 'Waleed vs Torvalds' },
                   { a: 'antfu', b: 'sindresorhus', label: 'Anthony Fu vs Sindre' }
                 ].map((preset) => (

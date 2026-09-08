@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] useLeaderboard.js
 import { useState, useEffect, useCallback } from 'react';
 import { leaderboardService } from '../services/leaderboardService';
 import { LOADING_STATES } from '../utils/constants';

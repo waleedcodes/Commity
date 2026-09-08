@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] CommandPalette.js
 'use client';
 
 import { useState, useEffect, useRef, useMemo } from 'react';

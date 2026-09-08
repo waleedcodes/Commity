@@ -65,6 +65,21 @@ class LeaderboardService {
   async getLeaderboardFilters() {
     return apiService.get('/leaderboard/filters');
   }
+
+  // Get dynamic regions list
+  async getRegions() {
+    return apiService.get('/leaderboard/regions');
+  }
+
+  // Get algorithmic featured developers
+  async getFeaturedDevelopers() {
+    return apiService.get('/leaderboard/featured');
+  }
+
+  // Get regional ranking snapshots history
+  async getSnapshots(region = 'pakistan', limit = 5) {
+    return apiService.get('/leaderboard/snapshots', { region, limit });
+  }
 }
 
 export const leaderboardService = new LeaderboardService();

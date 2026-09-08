@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] leaderboardService.js
 import { apiService } from './api';
 
 class LeaderboardService {
@@ -55,3 +54,32 @@ class LeaderboardService {
   // Get trending users
   async getTrendingUsers(params = {}) {
     return apiService.get('/leaderboard/trending', params);
+  }
+
+  // Get recent activity leaders
+  async getRecentActivityLeaders(params = {}) {
+    return apiService.get('/leaderboard/recent-activity', params);
+  }
+
+  // Get leaderboard filters/categories
+  async getLeaderboardFilters() {
+    return apiService.get('/leaderboard/filters');
+  }
+
+  // Get dynamic regions list
+  async getRegions() {
+    return apiService.get('/leaderboard/regions');
+  }
+
+  // Get algorithmic featured developers
+  async getFeaturedDevelopers() {
+    return apiService.get('/leaderboard/featured');
+  }
+
+  // Get regional ranking snapshots history
+  async getSnapshots(region = 'pakistan', limit = 5) {
+    return apiService.get('/leaderboard/snapshots', { region, limit });
+  }
+}
+
+export const leaderboardService = new LeaderboardService();

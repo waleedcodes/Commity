@@ -1,6 +1,6 @@
-// [Commity Core Phase 1: Setup] page.js
+// [Commity Core Phase 2: Logic] page.js
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
@@ -8,7 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/Avatar';
 import { Input } from '../components/ui/Input';
-import { useLeaderboard, useLeaderboardStats } from '../hooks/useLeaderboard';
+import { useLeaderboard, useLeaderboardStats, useRegions } from '../hooks/useLeaderboard';
 import { formatNumber } from '../utils/helpers';
 import { LEADERBOARD_CATEGORIES, LEADERBOARD_TIMEFRAMES } from '../utils/constants';
 import { 
@@ -178,6 +178,29 @@ export default function Leaderboard() {
   });
   
   const { stats, loading: statsLoading, refetch: refetchStats } = useLeaderboardStats();
+  const { regions: dynamicRegions } = useRegions();
+
+  const countryOptions = useMemo(() => {
+    if (!dynamicRegions || dynamicRegions.length === 0) return POPULAR_COUNTRIES;
+    return dynamicRegions.map((r) => ({
+      id: r.query || r.name,
+      label: r.name,
+      flag: r.flag || '🌍',
+      indexedMaintainers: r.indexedMaintainers,
+      totalUsersFound: r.totalUsersFound,
+      minimumFollowers: r.minimumFollowers,
+    }));
+  }, [dynamicRegions]);
+
+  const matchedRegion = useMemo(() => {
+    if (!dynamicRegions || !selectedLocation) return null;
+    return dynamicRegions.find(
+      (r) =>
+        (r.query && r.query.toLowerCase() === selectedLocation.toLowerCase()) ||
+        (r.name && r.name.toLowerCase() === selectedLocation.toLowerCase()) ||
+        (r.id && r.id.toLowerCase() === selectedLocation.toLowerCase())
+    );
+  }, [dynamicRegions, selectedLocation]);
 
   const handleLaunchDuel = (targetUsername, e) => {
     if (e) {
@@ -271,14 +294,30 @@ export default function Leaderboard() {
     window.scrollTo({ top: 400, behavior: 'smooth' });
   };
 
-  const currentScale = REGIONAL_DEVELOPER_SCALE[selectedLocation] || {
-    regionName: selectedLocation,
-    totalUsers: regionSummary?.totalInRegion ? formatNumber(regionSummary.totalInRegion) : '160,760',
-    totalUsersLabel: `GitHub Users in ${selectedLocation}`,
-    indexedQuota: 'Top 256 Ranked Maintainers',
-    minFollowers: `${regionSummary?.minFollowers || 69}+ Followers Required`,
-    desc: `Active maintainers directory in ${selectedLocation}.`,
-  };
+  const currentScale = useMemo(() => {
+    if (matchedRegion) {
+      return {
+        regionName: matchedRegion.name,
+        totalUsers: matchedRegion.totalUsersFound
+          ? formatNumber(matchedRegion.totalUsersFound)
+          : regionSummary?.totalInRegion
+          ? formatNumber(regionSummary.totalInRegion)
+          : '100,000+',
+        totalUsersLabel: `GitHub Users in ${matchedRegion.name}`,
+        indexedQuota: `Top ${matchedRegion.indexedMaintainers || 256} Ranked Maintainers`,
+        minFollowers: `${matchedRegion.minimumFollowers || regionSummary?.minFollowers || 10}+ Followers Threshold`,
+        desc: `Candidate discovery by follower cohort, ranked by authentic 365-day GraphQL contributions in ${matchedRegion.name}.`,
+      };
+    }
+    return REGIONAL_DEVELOPER_SCALE[selectedLocation] || {
+      regionName: selectedLocation === 'all' ? 'Worldwide' : selectedLocation,
+      totalUsers: regionSummary?.totalInRegion ? formatNumber(regionSummary.totalInRegion) : '100,000,000+',
+      totalUsersLabel: `GitHub Users in ${selectedLocation === 'all' ? 'Worldwide' : selectedLocation}`,
+      indexedQuota: 'Top 256 Ranked Maintainers',
+      minFollowers: `${regionSummary?.minFollowers || 50}+ Followers Threshold`,
+      desc: `Active maintainers directory in ${selectedLocation === 'all' ? 'Worldwide' : selectedLocation}.`,
+    };
+  }, [matchedRegion, selectedLocation, regionSummary]);
 
   const handleRefreshAll = () => {
     refetch();
@@ -466,7 +505,7 @@ export default function Leaderboard() {
           <div className="p-4 rounded-2xl bg-slate-800/70 border border-indigo-500/30 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-lg shadow-indigo-950/20">
             <div className="flex items-center gap-3">
               <span className="text-3xl p-1.5 rounded-xl bg-slate-900 border border-slate-700">
-                {POPULAR_COUNTRIES.find(c => c.id === selectedLocation)?.flag || '📍'}
+                {matchedRegion?.flag || countryOptions.find(c => c.id === selectedLocation)?.flag || '📍'}
               </span>
               <div>
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
@@ -678,357 +717,3 @@ export default function Leaderboard() {
         <Card className="bg-slate-800/60 border-slate-700/80 backdrop-blur-sm">
           <CardContent className="p-6 space-y-6">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              {/* Search & Export Buttons */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:max-w-xl">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <Input
-                    placeholder="Search ranking by name or username..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-slate-900/80 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-indigo-500"
-                  />
-                </div>
-
-                {/* Export Buttons */}
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExportCSV}
-                    className="border-slate-700 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800 text-xs gap-1"
-                    title="Export current ranking table to CSV"
-                  >
-                    <Download className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>CSV</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleExportJSON}
-                    className="border-slate-700 bg-slate-900/80 text-slate-300 hover:text-white hover:bg-slate-800 text-xs gap-1"
-                    title="Export current ranking table to JSON"
-                  >
-                    <Download className="w-3.5 h-3.5 text-blue-400" />
-                    <span>JSON</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Timeframe Selector */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
-                <span className="text-xs text-slate-400 font-medium mr-2 whitespace-nowrap">Timeframe:</span>
-                {Object.entries(LEADERBOARD_TIMEFRAMES).map(([key, label]) => (
-                  <Button
-                    key={key}
-                    variant={selectedTimeframe === key ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleTimeframeChange(key)}
-                    className={
-                      selectedTimeframe === key
-                        ? "bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
-                        : "border-slate-700 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Category Selector Buttons */}
-            <div>
-              <p className="text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">Rank by Metric</p>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(LEADERBOARD_CATEGORIES).map(([key, label]) => (
-                  <Button
-                    key={key}
-                    variant={selectedCategory === key ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleCategoryChange(key)}
-                    className={
-                      selectedCategory === key
-                        ? "bg-amber-500 text-slate-950 hover:bg-amber-400 font-semibold shadow-md shadow-amber-500/20"
-                        : "border-slate-700 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Country / Region Filter (committers.top model) */}
-            <div className="pt-2 border-t border-slate-700/60">
-              <p className="text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider flex items-center gap-1.5">
-                <Globe className="w-3.5 h-3.5 text-cyan-400" /> Filter by Country / Region
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {POPULAR_COUNTRIES.map((c) => (
-                  <Button
-                    key={c.id}
-                    variant={selectedLocation === c.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleLocationChange(c.id)}
-                    className={
-                      selectedLocation === c.id
-                        ? "bg-indigo-600 text-white hover:bg-indigo-500 font-semibold shadow-md shadow-indigo-500/20"
-                        : "border-slate-700 bg-slate-900/50 text-slate-300 hover:bg-slate-800 hover:text-white"
-                    }
-                  >
-                    <span className="mr-1.5">{c.flag}</span>
-                    {c.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Full Leaderboard Table / Cards */}
-        <Card className="bg-slate-800/60 border-slate-700/80 backdrop-blur-sm overflow-hidden">
-          <CardHeader className="border-b border-slate-700/60 py-4 px-6 flex flex-row items-center justify-between">
-            <CardTitle className="text-base font-semibold text-white flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-amber-400" />
-              <span>{LEADERBOARD_CATEGORIES[selectedCategory]} Leaderboard</span>
-              <span className="text-xs text-slate-400 font-normal">({filteredLeaderboard.length} contributors)</span>
-            </CardTitle>
-            <span className="text-xs text-slate-400">
-              Showing sorted rankings
-            </span>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-6 space-y-3">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="flex items-center gap-4 p-4 rounded-xl border border-slate-700/40 bg-slate-900/40 animate-pulse">
-                    <div className="w-8 h-8 rounded-lg bg-slate-700"></div>
-                    <div className="w-12 h-12 rounded-full bg-slate-700"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-slate-700 rounded w-1/4"></div>
-                      <div className="h-3 bg-slate-700 rounded w-1/2"></div>
-                    </div>
-                    <div className="w-20 h-8 bg-slate-700 rounded"></div>
-                  </div>
-                ))}
-              </div>
-            ) : filteredLeaderboard.length === 0 ? (
-              <div className="text-center py-16 px-4">
-                <Users className="w-12 h-12 mx-auto text-slate-500 mb-3" />
-                <p className="text-lg font-medium text-slate-200">No contributors found</p>
-                <p className="text-sm text-slate-400 mt-1 max-w-sm mx-auto">
-                  Try adjusting your search query or switching to another category.
-                </p>
-              </div>
-            ) : (
-              <div className="divide-y divide-slate-700/50">
-                {filteredLeaderboard.map((user, index) => {
-                  const rank = user.rank || index + 1;
-                  const username = user.username || user.login;
-                  const val = getMetricValue(user, selectedCategory);
-                  const isTop3 = rank <= 3;
-                  const isWaleed = username?.toLowerCase() === 'waleedcodes';
-
-                  return (
-                    <Link
-                      key={user._id || user.id || username}
-                      href={`/profile/${username}`}
-                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 transition hover:bg-slate-700/40 group ${
-                        isWaleed 
-                          ? 'bg-amber-500/10 border-l-4 border-amber-500 shadow-sm'
-                          : rank === 1 ? 'bg-amber-500/5' : rank === 2 ? 'bg-slate-800/40' : rank === 3 ? 'bg-amber-950/10' : ''
-                      }`}
-                    >
-                      <div className="flex items-center gap-4 min-w-0">
-                        {/* Rank Badge */}
-                        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm">
-                          {rank === 1 ? (
-                            <span className="text-2xl" title="Rank 1">🥇</span>
-                          ) : rank === 2 ? (
-                            <span className="text-2xl" title="Rank 2">🥈</span>
-                          ) : rank === 3 ? (
-                            <span className="text-2xl" title="Rank 3">🥉</span>
-                          ) : (
-                            <span className={`font-mono ${isWaleed ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>#{rank}</span>
-                          )}
-                        </div>
-
-                        {/* Avatar */}
-                        <Avatar className={`h-12 w-12 shrink-0 ring-2 ${
-                          isWaleed ? 'ring-amber-400 shadow-md' : rank === 1 ? 'ring-amber-400' : rank === 2 ? 'ring-slate-300' : rank === 3 ? 'ring-amber-600' : 'ring-slate-700'
-                        }`}>
-                          <AvatarImage src={user.avatarUrl || user.avatar_url} alt={username} />
-                          <AvatarFallback className="bg-slate-700 text-slate-200 font-medium">
-                            {username?.slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-
-                        {/* User Metadata */}
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-white group-hover:text-indigo-400 transition truncate">
-                              {user.name || username}
-                            </h3>
-                            <span className="text-xs text-slate-400 font-mono">@{username}</span>
-                            {isWaleed && (
-                              <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] py-0 font-semibold">
-                                ★ Featured Maintainer (#38 PK)
-                              </Badge>
-                            )}
-                            {user.location && (
-                              <Badge variant="outline" className="text-[11px] py-0 border-slate-700 text-slate-400 hidden md:inline-flex">
-                                {user.location}
-                              </Badge>
-                            )}
-                          </div>
-                          
-                          <p className="text-xs text-slate-400 truncate max-w-md mt-0.5">
-                            {user.bio || user.company || 'Open source developer'}
-                          </p>
-
-                          {/* Languages */}
-                          {user.topLanguages && user.topLanguages.length > 0 && (
-                            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-                              {user.topLanguages.slice(0, 3).map((lang, lIdx) => (
-                                <span 
-                                  key={lang.name || lIdx} 
-                                  className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-slate-900/80 border border-slate-700/60 text-slate-300"
-                                >
-                                  <span 
-                                    className="w-1.5 h-1.5 rounded-full" 
-                                    style={{ backgroundColor: lang.color || '#6366f1' }}
-                                  />
-                                  {lang.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Score / Metric */}
-                      <div className="flex items-center justify-between sm:justify-end gap-6 shrink-0 pl-12 sm:pl-0 border-t sm:border-t-0 border-slate-800 pt-2 sm:pt-0">
-                        <div className="text-left sm:text-right">
-                          <div className="text-lg sm:text-xl font-bold text-white group-hover:text-indigo-400 transition flex items-center sm:justify-end gap-1">
-                            {formatNumber(val)}
-                            <ArrowUpRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition text-indigo-400" />
-                          </div>
-                          <div className="text-xs text-slate-400 capitalize">
-                            {getMetricUnit(selectedCategory)}
-                          </div>
-                        </div>
-
-                        {/* Extra Stats Pill */}
-                        <div className="hidden lg:flex flex-col text-right text-xs text-slate-400 border-l border-slate-700/60 pl-4 space-y-0.5">
-                          <span><strong>{formatNumber(user.followers || 0)}</strong> followers</span>
-                          <span><strong>{formatNumber(user.publicRepos || 0)}</strong> repos</span>
-                        </div>
-
-                        {/* 1-Click Duel Action Button */}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => handleLaunchDuel(username, e)}
-                          className="h-8 px-2.5 rounded-lg border border-indigo-500/30 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 text-xs font-semibold flex items-center gap-1.5 transition-colors shrink-0"
-                          title={`Challenge @${username} to a head-to-head duel`}
-                        >
-                          <Swords className="w-3.5 h-3.5 text-indigo-400" />
-                          <span className="hidden sm:inline">Duel</span>
-                        </Button>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Pagination Controls */}
-            {pagination && pagination.totalPages > 1 && (
-              <div className="p-4 border-t border-slate-700/60 bg-slate-900/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <span className="text-xs text-slate-400">
-                  Showing Page <strong className="text-white">{currentPage}</strong> of <strong className="text-white">{pagination.totalPages}</strong> ({pagination.totalCount || 256} maintainers indexed)
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage <= 1 || loading}
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    className="border-slate-700 bg-slate-800 text-xs text-slate-300 hover:text-white disabled:opacity-40"
-                  >
-                    Previous Page
-                  </Button>
-                  <div className="flex items-center gap-1">
-                    {[...Array(Math.min(5, pagination.totalPages))].map((_, pIdx) => {
-                      const pageNum = pIdx + 1;
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => handlePageChange(pageNum)}
-                          className={`w-8 h-8 rounded-lg text-xs font-semibold transition ${
-                            currentPage === pageNum 
-                              ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20'
-                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage >= pagination.totalPages || loading}
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    className="border-slate-700 bg-slate-800 text-xs text-slate-300 hover:text-white disabled:opacity-40"
-                  >
-                    Next Page
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Methodology & FAQ Section (committers.top architecture) */}
-        <Card className="bg-slate-800/50 border-slate-700/80 backdrop-blur-sm">
-          <CardHeader className="py-4 px-6 border-b border-slate-700/60 flex flex-row items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-amber-400" />
-            <CardTitle className="text-base font-semibold text-white">
-              Methodology & Frequently Asked Questions (committers.top Engine)
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6 divide-y divide-slate-700/50">
-            {LEADERBOARD_FAQS.map((faq, idx) => {
-              const isExpanded = expandedFaq === idx;
-              return (
-                <div key={idx} className="py-3.5 first:pt-0 last:pb-0">
-                  <button
-                    onClick={() => setExpandedFaq(isExpanded ? null : idx)}
-                    className="w-full flex items-center justify-between text-left group"
-                  >
-                    <span className="text-sm font-semibold text-slate-200 group-hover:text-amber-400 transition-colors">
-                      {faq.q}
-                    </span>
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4 text-amber-400 shrink-0 ml-2" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 ml-2" />
-                    )}
-                  </button>
-                  {isExpanded && (
-                    <p className="mt-2 text-xs text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-xl border border-slate-700/60">
-                      {faq.a}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </main>
-    </div>
-  );
-}
-

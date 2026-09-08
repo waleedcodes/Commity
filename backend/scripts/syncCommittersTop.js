@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] syncCommittersTop.js
 const mongoose = require('mongoose');
 require('dotenv').config({ path: __dirname + '/../.env' });
 const CommittersService = require('../src/services/committersService');

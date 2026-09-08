@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] syncCommittersTop.js
+// [Commity Core Phase 2: Logic] syncCommittersTop.js
 const mongoose = require('mongoose');
 require('dotenv').config({ path: __dirname + '/../.env' });
 const CommittersService = require('../src/services/committersService');
@@ -19,9 +19,8 @@ async function main() {
     logger.info('=== INGESTING PAKISTAN TOP 256 DEVELOPERS ===');
     const pkResult = await CommittersService.syncRegion('pakistan', 'Pakistan');
     console.log('Pakistan Sync Result:', pkResult);
-
-    // 2. Check waleedcodes rank and top 5 developers
     const User = require('../src/models/User');
+    await User.recalculateRegionalRanks('pakistan');
     const topPk = await User.find({ location: { $regex: 'pakistan', $options: 'i' } })
       .sort({ totalContributions: -1 })
       .limit(5)
@@ -34,20 +33,3 @@ async function main() {
       console.log(`\n@waleedcodes Status:`);
       console.log(`  Name: ${waleed.name}`);
       console.log(`  Contributions: ${waleed.totalContributions.toLocaleString()}`);
-      console.log(`  Country Rank: #${waleed.countryRank || 'N/A'}`);
-    }
-
-    const totalPkCount = await User.countDocuments({ location: { $regex: 'pakistan', $options: 'i' } });
-    const totalAllCount = await User.countDocuments();
-    console.log(`\nTotal Users in DB: ${totalAllCount}`);
-    console.log(`Total Pakistan Developers in DB: ${totalPkCount}`);
-
-    process.exit(0);
-  } catch (error) {
-    logger.error('Error running syncCommittersTop:', error.message);
-    console.error(error);
-    process.exit(1);
-  }
-}
-
-main();

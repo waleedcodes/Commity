@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({

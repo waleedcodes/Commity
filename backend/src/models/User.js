@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
@@ -285,3 +284,146 @@ userSchema.virtual('profileCompletion').get(function() {
   let completion = 0;
   const fields = ['name', 'bio', 'company', 'location', 'blog', 'email'];
   
+  fields.forEach(field => {
+    if (this[field] && this[field].trim()) {
+      completion += 1;
+    }
+  });
+  
+  return Math.round((completion / fields.length) * 100);
+});
+
+// Pre-save middleware
+userSchema.pre('save', function(next) {
+  // If totalContributions is not set or 0, compute from components as fallback
+  if (!this.totalContributions || this.totalContributions === 0) {
+    const calculatedSum = (this.totalCommits || 0) + 
+                          (this.totalPullRequests || 0) + 
+                          (this.totalIssues || 0) + 
+                          (this.totalReviews || 0);
+    if (calculatedSum > 0) {
+      this.totalContributions = calculatedSum;
+    }
+  }
+
+  // Update timestamps if analytics data changed
+  if (this.isModified('totalCommits') || this.isModified('totalPullRequests') || 
+      this.isModified('totalIssues') || this.isModified('totalReviews') ||
+      this.isModified('totalContributions')) {
+    this.lastFetchedAt = new Date();
+    this.lastAnalyticsUpdate = new Date();
+    this.statsUpdatedAt = new Date();
+  }
+  
+  next();
+});
+
+// Static methods
+userSchema.statics.findByUsername = function(username) {
+  return this.findOne({ username: username.toLowerCase() });
+};
+
+userSchema.statics.findByGitHubId = function(githubId) {
+  return this.findOne({ githubId });
+};
+
+userSchema.statics.getLeaderboard = function(category = 'totalCommits', limit = 100, location = null) {
+  const query = { isActive: true, accountType: { $ne: 'Organization' } };
+  
+  if (location) {
+    query.location = new RegExp(location, 'i');
+  }
+  
+  return this.find(query)
+    .sort({ [category]: -1 })
+    .limit(limit)
+    .select('-contributionCalendar -recentRepos');
+};
+
+userSchema.statics.recalculateRegionalRanks = async function(region = 'pakistan') {
+  const users = await this.find({
+    location: { $regex: region, $options: 'i' },
+    isActive: true,
+    accountType: { $ne: 'Organization' },
+  }).sort({ totalContributions: -1, followers: -1 });
+
+  let updatedCount = 0;
+  for (let i = 0; i < users.length; i++) {
+    const rank = i + 1;
+    // Only update countryRank for users who DON'T have official committers.top data.
+    // Users with countryRankAll have authoritative rankings from syncRegion().
+    if (!users[i].countryRankAll && users[i].countryRank !== rank) {
+      users[i].countryRank = rank;
+      await users[i].save();
+      updatedCount++;
+    }
+  }
+  return updatedCount;
+};
+
+// Instance methods
+userSchema.methods.updateRank = async function(category = 'totalContributions') {
+  const sortVal = this[category] || 0;
+
+  // NOTE: We do NOT compute globalRank here.
+  // Counting "users in our DB with more contributions" is NOT a real global rank —
+  // it's just a rank within our small indexed subset (e.g., 60 users).
+  // globalRank is only meaningful when sourced from a real external dataset
+  // (e.g., committers.top worldwide ranking if/when available).
+  // Showing a fake #3 out of 60 is worse than showing nothing.
+
+  // countryRank logic:
+  // - countryRankAll, countryRankPublic, countryRankCommits are set EXCLUSIVELY
+  //   by CommittersService.syncRegion() from the official committers.top data.
+  //   We NEVER overwrite those values here.
+  // - countryRank (the primary display rank) mirrors countryRankAll when available.
+  if (this.countryRankAll) {
+    this.countryRank = this.countryRankAll;
+  } else if (this.location && !this.countryRank) {
+    // Fallback: compute a rough country rank from the DB, but only if
+    // there are enough regional users for a meaningful calculation.
+    const MIN_REGIONAL_USERS = 5;
+    const locParts = this.location.split(',').map(s => s.trim());
+    const regionName = locParts[locParts.length - 1] || this.location;
+
+    const regionalUserCount = await this.constructor.countDocuments({
+      location: { $regex: regionName, $options: 'i' },
+      isActive: true,
+      accountType: { $ne: 'Organization' },
+    });
+
+    if (regionalUserCount >= MIN_REGIONAL_USERS) {
+      const regionalHigherCount = await this.constructor.countDocuments({
+        [category]: { $gt: sortVal },
+        location: { $regex: regionName, $options: 'i' },
+        isActive: true,
+        accountType: { $ne: 'Organization' },
+      });
+      this.countryRank = regionalHigherCount + 1;
+    }
+    // If not enough regional users, leave countryRank as-is
+  }
+
+  await this.save();
+  return this.countryRank || null;
+};
+
+userSchema.methods.toPublicJSON = function() {
+  const obj = this.toObject({ virtuals: true });
+  
+  // Provide compatibility aliases
+  obj.login = obj.username;
+  obj.currentStreak = obj.contributionStreak || 0;
+  obj.countryRank = this.countryRank || this.countryRankAll || null;
+  obj.countryRankAll = this.countryRankAll || this.countryRank || null;
+  obj.countryRankPublic = this.countryRankPublic || null;
+  obj.countryRankCommits = this.countryRankCommits || null;
+  
+  // Remove sensitive information
+  delete obj.email;
+  delete obj.__v;
+  
+  return obj;
+};
+
+module.exports = mongoose.model('User', userSchema);

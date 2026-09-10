@@ -246,13 +246,28 @@ class UserService {
       const categories = ['totalCommits', 'followers', 'publicRepos', 'totalContributions'];
       const positions = {};
 
+      const total = await User.countDocuments({ isActive: true });
+      // NOTE: these ranks are within our indexed DB subset only — NOT global ranks.
+      // Minimum threshold to return any rank at all.
+      const MIN_USERS = 5;
+
       for (const category of categories) {
+        if (total < MIN_USERS) {
+          positions[category] = {
+            rank: null,
+            total,
+            percentile: null,
+            value: user[category],
+            note: 'Not enough indexed users for meaningful ranking',
+          };
+          continue;
+        }
+
         const rank = await User.countDocuments({
           [category]: { $gt: user[category] },
           isActive: true,
         }) + 1;
 
-        const total = await User.countDocuments({ isActive: true });
         const percentile = Math.round((1 - (rank - 1) / total) * 100);
 
         positions[category] = {
@@ -260,6 +275,7 @@ class UserService {
           total,
           percentile,
           value: user[category],
+          context: 'db_indexed_only',
         };
       }
 

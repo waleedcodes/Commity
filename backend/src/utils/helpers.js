@@ -1,4 +1,3 @@
-// [Commity Core Phase 2: Logic] helpers.js
 const moment = require('moment');
 const { REGEX, TIME } = require('../config/constants');
 
@@ -330,3 +329,169 @@ class Helpers {
     const hasPrevPage = page > 1;
     
     return {
+      currentPage: page,
+      totalPages,
+      totalItems,
+      itemsPerPage: limit,
+      hasNextPage,
+      hasPrevPage,
+      nextPage: hasNextPage ? page + 1 : null,
+      prevPage: hasPrevPage ? page - 1 : null,
+    };
+  }
+  
+  /**
+   * Convert camelCase to snake_case
+   * @param {string} str - String to convert
+   * @returns {string} snake_case string
+   */
+  static camelToSnake(str) {
+    return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+  }
+  
+  /**
+   * Convert snake_case to camelCase
+   * @param {string} str - String to convert
+   * @returns {string} camelCase string
+   */
+  static snakeToCamel(str) {
+    return str.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+  }
+  
+  /**
+   * Calculate contribution score based on different factors
+   * @param {object} contributions - Contribution data
+   * @returns {number} Calculated score
+   */
+  static calculateContributionScore(contributions) {
+    const weights = {
+      commits: 1,
+      pullRequests: 3,
+      issues: 2,
+      reviews: 2,
+      releases: 5,
+    };
+    
+    let score = 0;
+    Object.entries(contributions).forEach(([type, count]) => {
+      if (weights[type]) {
+        score += count * weights[type];
+      }
+    });
+    
+    return score;
+  }
+  
+  /**
+   * Generate color based on string hash
+   * @param {string} str - String to generate color from
+   * @returns {string} Hex color code
+   */
+  static generateColorFromString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+    return '#' + '00000'.substring(0, 6 - color.length) + color;
+  }
+  
+  /**
+   * Chunk array into smaller arrays
+   * @param {Array} array - Array to chunk
+   * @param {number} size - Chunk size
+   * @returns {Array} Array of chunks
+   */
+  /**
+   * Calculate median of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateMedian(values) {
+    if (!values || values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  }
+
+  /**
+   * Calculate standard deviation of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateStandardDeviation(values) {
+    if (!values || values.length === 0) return 0;
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const squareDiffs = values.map(val => Math.pow(val - mean, 2));
+    const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
+    return Math.sqrt(avgSquareDiff);
+  }
+
+  /**
+   * Normalize country name from freeform location string
+   * @param {string} location
+   * @returns {string|null}
+   */
+  static normalizeCountry(location) {
+    if (!location || typeof location !== 'string') return null;
+    const clean = location.trim();
+    if (!clean || /^(undefined|null|none|n\/a|\?|-)$/i.test(clean)) return null;
+
+    const lower = clean.toLowerCase();
+
+    // Known country keywords / aliases & major tech hubs
+    if (/\b(pakistan|pk)\b/i.test(lower) || /\b(karachi|lahore|islamabad|rawalpindi|abbottabad|faisalabad|multan|peshawar|quetta|sialkot|gujranwala)\b/i.test(lower)) {
+      return 'Pakistan';
+    }
+    if (/\b(united states|usa|u\.s\.a|u\.s\.|us)\b/i.test(lower) || /\b(california|new york|san francisco|seattle|austin|chicago|boston|los angeles|texas|washington|silicon valley)\b/i.test(lower)) {
+      return 'United States';
+    }
+    if (/\b(india|in)\b/i.test(lower) || /\b(bangalore|bengaluru|delhi|mumbai|pune|hyderabad|chennai|noida|gurgaon)\b/i.test(lower)) {
+      return 'India';
+    }
+    if (/\b(united kingdom|uk|u\.k\.|england|scotland|wales|london)\b/i.test(lower)) {
+      return 'United Kingdom';
+    }
+    if (/\b(germany|deutschland|berlin|munich|hamburg)\b/i.test(lower)) {
+      return 'Germany';
+    }
+    if (/\b(canada|toronto|vancouver|montreal|ontario|quebec)\b/i.test(lower)) {
+      return 'Canada';
+    }
+    if (/\b(france|paris)\b/i.test(lower)) {
+      return 'France';
+    }
+    if (/\b(japan|tokyo)\b/i.test(lower)) {
+      return 'Japan';
+    }
+    if (/\b(china|beijing|shanghai|shenzhen|hangzhou)\b/i.test(lower)) {
+      return 'China';
+    }
+    if (/\b(australia|sydney|melbourne|brisbane)\b/i.test(lower)) {
+      return 'Australia';
+    }
+    if (/\b(brazil|brasil|sao paulo|rio de janeiro)\b/i.test(lower)) {
+      return 'Brazil';
+    }
+    if (/\b(netherlands|amsterdam|rotterdam)\b/i.test(lower)) {
+      return 'Netherlands';
+    }
+    if (/\b(singapore)\b/i.test(lower)) {
+      return 'Singapore';
+    }
+
+    // Fallback: If formatted as "City, Country", take the last segment
+    if (clean.includes(',')) {
+      const parts = clean.split(',');
+      const candidate = parts[parts.length - 1].trim();
+      if (candidate && candidate.length > 1 && !/^(undefined|null)$/i.test(candidate)) {
+        return candidate.replace(/\b\w/g, c => c.toUpperCase());
+      }
+    }
+
+    return clean.replace(/\b\w/g, c => c.toUpperCase());
+  }
+}
+
+module.exports = Helpers;

@@ -234,8 +234,8 @@ export default function ProfileHub() {
 
   // Compare Modal State
   const [compareModalOpen, setCompareModalOpen] = useState(false);
-  const [compareUserA, setCompareUserA] = useState('waleedcodes');
-  const [compareUserB, setCompareUserB] = useState('sufiyanshahiddev');
+  const [compareUserA, setCompareUserA] = useState('');
+  const [compareUserB, setCompareUserB] = useState('');
   const [modalShowBadges, setModalShowBadges] = useState(false);
   const [modalCompareTheme, setModalCompareTheme] = useState('default');
   const [modalCopiedMarkdown, setModalCopiedMarkdown] = useState(false);
@@ -268,7 +268,18 @@ export default function ProfileHub() {
   useEffect(() => {
     let isMounted = true;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-    fetch(`${API_URL}/users/waleedcodes`)
+    let target = 'waleedcodes';
+    try {
+      const saved = localStorage.getItem('commity_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.username) target = parsed.username;
+      }
+    } catch {
+      // ignore
+    }
+
+    fetch(`${API_URL}/users/${target}`)
       .then(r => r.json())
       .then(json => {
         if (!isMounted) return;
@@ -307,11 +318,11 @@ export default function ProfileHub() {
           const mapped = raw.map((u, idx) => ({
             username: u.username || u.login,
             name: u.name || u.username,
-            role: (u.username === 'waleedcodes') ? 'Full-Stack Developer' : 'Open Source Maintainer',
-            location: (u.username === 'waleedcodes') ? 'Abbottabad, Pakistan' : (u.location || selectedCity),
+            role: u.bio ? u.bio.split(/[|•·]/)[0].trim() : 'Software Engineer',
+            location: u.location || selectedCity,
             flag: '🇵🇰',
-            rank: `#${u.countryRank || u.rank || (idx + 1)} ${selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1)}`,
-            rankNum: u.countryRank || u.rank || (idx + 1),
+            rank: `#${u.countryRankAll || u.countryRank || u.rank || (idx + 1)} ${selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1)}`,
+            rankNum: u.countryRankAll || u.countryRank || u.rank || (idx + 1),
             avatar: u.avatarUrl || u.avatar_url || `https://avatars.githubusercontent.com/u/${u.githubId}?v=4`,
             contributions: (u.totalContributions || 0) > 0 ? u.totalContributions : ((u.publicContributions || 0) + (u.privateContributions || 0)),
             publicContribs: u.publicContributions || u.totalContributions || 0,
@@ -364,23 +375,22 @@ export default function ProfileHub() {
       const publicC = u.publicContributions || u.totalContributions || 0;
       const privateC = u.privateContributions || 0;
       const totalC = (u.totalContributions || 0) > 0 ? u.totalContributions : (publicC + privateC);
-
-      // Extract primary language
       const primLang = u.topLanguages?.[0]?.name || 'TypeScript';
+      const officialRank = u.countryRankAll || u.countryRank || u.rank || (idx + 1);
 
       return {
         username: u.username || u.login,
         name: u.name || u.username,
-        role: u.username === 'waleedcodes' ? 'Full-Stack Developer' : 'Open Source Maintainer',
-        location: u.username === 'waleedcodes' ? 'Abbottabad, Pakistan' : (u.location || 'Pakistan'),
+        role: u.bio ? u.bio.split(/[|•·]/)[0].trim() : 'Software Engineer',
+        location: u.location || 'Pakistan',
         flag: '🇵🇰',
-        rank: `#${u.countryRank || u.rank || (idx + 1)} Pakistan`,
-        rankNum: u.countryRank || u.rank || (idx + 1),
+        rank: `#${officialRank} Pakistan`,
+        rankNum: officialRank,
         avatar: u.avatarUrl || u.avatar_url || `https://avatars.githubusercontent.com/u/${u.githubId}?v=4`,
         contributions: totalC,
         publicContribs: publicC,
         privateContribs: privateC,
-        followers: u.followers || 69,
+        followers: u.followers || 0,
         repos: u.publicRepos || 0,
         streak: u.contributionStreak || 0,
         lang: primLang,
@@ -404,9 +414,8 @@ export default function ProfileHub() {
 
     PAKISTAN_CITIES.forEach(c => {
       if (c.id === 'all') return;
-      const inPk = pakistanMaintainers.filter(u => 
-        (u.location || '').toLowerCase().includes(c.id.toLowerCase()) ||
-        (c.id === 'abbottabad' && u.username === 'waleedcodes')
+      const inPk = pakistanMaintainers.filter(u =>
+        (u.location || '').toLowerCase().includes(c.id.toLowerCase())
       );
       const inCityData = cityData[c.id] || [];
       const combined = new Set([...inPk.map(u => u.username), ...inCityData.map(u => u.username)]);
@@ -422,9 +431,8 @@ export default function ProfileHub() {
     if (selectedCity === 'all') {
       list = [...pakistanMaintainers];
     } else {
-      const fromPk = pakistanMaintainers.filter((u) => 
-        (u.location || '').toLowerCase().includes(selectedCity.toLowerCase()) ||
-        (selectedCity === 'abbottabad' && u.username === 'waleedcodes')
+      const fromPk = pakistanMaintainers.filter((u) =>
+        (u.location || '').toLowerCase().includes(selectedCity.toLowerCase())
       );
       const fromCity = cityData[selectedCity] || [];
       const userMap = new Map();
@@ -482,8 +490,8 @@ export default function ProfileHub() {
       role: 'Software Engineer',
       location: u.location || 'Global',
       flag: (u.location || '').toLowerCase().includes('pakistan') ? '🇵🇰' : '🌍',
-      rank: `#${u.countryRank || u.globalRank || (idx + 1)}`,
-      rankNum: u.countryRank || u.globalRank || (idx + 1),
+      rank: u.countryRankAll || u.countryRank ? `#${u.countryRankAll || u.countryRank}` : `#${idx + 1}`,
+      rankNum: u.countryRankAll || u.countryRank || (idx + 1),
       avatar: u.avatarUrl || u.avatar_url,
       contributions: u.totalContributions || u.totalCommits || 0,
       publicContribs: u.publicContributions || u.totalContributions || 0,
@@ -501,8 +509,8 @@ export default function ProfileHub() {
   const [compareDataB, setCompareDataB] = useState(null);
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState(null);
-  const [modalUserA, setModalUserA] = useState('waleedcodes');
-  const [modalUserB, setModalUserB] = useState('sufiyanshahiddev');
+  const [modalUserA, setModalUserA] = useState('');
+  const [modalUserB, setModalUserB] = useState('');
 
   // Fetch 100% authentic GitHub streak and profile data for Compare Modal
   const fetchCompareModalData = useCallback(async (uA, uB) => {
@@ -590,8 +598,10 @@ export default function ProfileHub() {
 
   // Open Compare Modal with 2 users
   const handleOpenCompare = (userHandle) => {
-    const uA = 'waleedcodes';
-    const uB = userHandle === 'waleedcodes' ? 'sufiyanshahiddev' : userHandle;
+    // Use the top-ranked user from the current list as User A (if not clicking on them)
+    const topUser = activeDisplayList[0]?.username || '';
+    const uA = userHandle === topUser ? (activeDisplayList[1]?.username || userHandle) : topUser;
+    const uB = userHandle;
     setCompareUserA(uA);
     setCompareUserB(uB);
     setModalUserA(uA);
@@ -754,16 +764,18 @@ export default function ProfileHub() {
 
             {/* Quick Actions Header */}
             <div className="flex items-center gap-2.5">
-              <Link href="/profile/waleedcodes">
-                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-500/20 h-10 px-4">
-                  <Avatar className="w-5 h-5 mr-2 ring-1 ring-white/40">
-                    <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="waleedcodes" />
-                    <AvatarFallback>WI</AvatarFallback>
-                  </Avatar>
-                  <span>@waleedcodes</span>
-                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                </Button>
-              </Link>
+              {featuredProfile?.username && (
+                <Link href={`/profile/${featuredProfile.username}`}>
+                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-500/20 h-10 px-4">
+                    <Avatar className="w-5 h-5 mr-2 ring-1 ring-white/40">
+                      <AvatarImage src={featuredProfile.avatarUrl} alt={featuredProfile.username} />
+                      <AvatarFallback>{featuredProfile.username.slice(0,2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <span>@{featuredProfile.username}</span>
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -832,8 +844,10 @@ export default function ProfileHub() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
               <div className="relative">
                 <Avatar className="w-20 h-20 sm:w-24 sm:h-24 ring-4 ring-amber-400/80 shadow-2xl shrink-0">
-                  <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="waleedcodes" />
-                  <AvatarFallback className="text-xl font-bold bg-slate-800 text-slate-200">WI</AvatarFallback>
+                  <AvatarImage src={featuredProfile?.avatarUrl} alt={featuredProfile?.username} />
+                  <AvatarFallback className="text-xl font-bold bg-slate-800 text-slate-200">
+                    {featuredProfile?.username?.slice(0,2).toUpperCase() || '??'}
+                  </AvatarFallback>
                 </Avatar>
                 {featuredRank && (
                   <div className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-lg flex items-center gap-1">
@@ -844,8 +858,8 @@ export default function ProfileHub() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-2xl font-black text-white">{featuredProfile?.name || 'Waleed Ishfaq'}</h3>
-                  <span className="text-sm text-blue-400 font-mono">@{featuredProfile?.username || 'waleedcodes'}</span>
+                  <h3 className="text-2xl font-black text-white">{featuredProfile?.name || featuredProfile?.username || 'Featured Maintainer'}</h3>
+                  <span className="text-sm text-blue-400 font-mono">@{featuredProfile?.username || 'maintainer'}</span>
                   {featuredRank && (
                     <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[11px] font-semibold py-0.5">
                       👑 #{featuredRank} PK (All)
@@ -866,7 +880,7 @@ export default function ProfileHub() {
                   </Badge>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-300">
-                  Full-Stack Software Engineer • Abbottabad, Pakistan 🇵🇰
+                  {featuredProfile?.bio?.split(/[|•·]/)[0]?.trim() || 'Software Engineer'} • {featuredProfile?.location || 'Pakistan'} 🇵🇰
                 </p>
                 <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
                   {featuredRank ? `Top ${(featuredRank / 160760 * 100).toFixed(3)}% ranked developer out of 160,760 in Pakistan. ` : ''}
@@ -898,7 +912,7 @@ export default function ProfileHub() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Link href="/profile/waleedcodes">
+                <Link href={`/profile/${featuredProfile?.username || ''}`}>
                   <Button className="w-full h-11 px-5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20">
                     <span>Open Full Profile</span>
                     <ArrowRight className="w-4 h-4 ml-1.5" />
@@ -1196,14 +1210,14 @@ export default function ProfileHub() {
                 const pubC = dev.publicContribs || totalC;
                 const privC = dev.privateContribs || (totalC > pubC ? totalC - pubC : 0);
                 const pubRatio = totalC > 0 ? Math.round((pubC / totalC) * 100) : 100;
-                const isWaleed = dev.username === 'waleedcodes';
+                const isTopRanked = dev.rankNum <= 3;
 
                 return (
                   <Card 
                     key={dev.username}
                     className={`border transition-all group backdrop-blur-sm flex flex-col justify-between ${
-                      isWaleed 
-                        ? 'bg-gradient-to-b from-blue-950/40 to-slate-900/90 border-blue-500/50 ring-1 ring-blue-500/30' 
+                      isTopRanked
+                        ? 'bg-gradient-to-b from-amber-950/30 to-slate-900/90 border-amber-500/40 ring-1 ring-amber-500/20'
                         : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
                     }`}
                   >
@@ -1213,7 +1227,7 @@ export default function ProfileHub() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="relative">
                           <Avatar className={`w-13 h-13 ring-2 transition-all ${
-                            isWaleed ? 'ring-amber-400 shadow-md shadow-amber-500/20' : 'ring-slate-700 group-hover:ring-blue-500'
+                            isTopRanked ? 'ring-amber-400 shadow-md shadow-amber-500/20' : 'ring-slate-700 group-hover:ring-blue-500'
                           }`}>
                             <AvatarImage src={dev.avatar} alt={dev.username} />
                             <AvatarFallback>{dev.username.slice(0, 2).toUpperCase()}</AvatarFallback>
@@ -1226,7 +1240,7 @@ export default function ProfileHub() {
                         <Badge 
                           variant="outline" 
                           className={`text-[10px] font-mono shrink-0 ${
-                            isWaleed ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'border-slate-700 text-slate-300'
+                            isTopRanked ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'border-slate-700 text-slate-300'
                           }`}
                         >
                           {dev.rank}
@@ -1322,7 +1336,7 @@ export default function ProfileHub() {
                       <tr 
                         key={dev.username} 
                         className={`hover:bg-slate-800/40 transition-colors ${
-                          dev.username === 'waleedcodes' ? 'bg-blue-950/20' : ''
+                          dev.rankNum <= 3 ? 'bg-amber-950/10' : ''
                         }`}
                       >
                         <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
@@ -1566,9 +1580,9 @@ export default function ProfileHub() {
               <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
                 <span>Presets:</span>
                 {[
-                  { a: 'waleedcodes', b: 'sufiyanshahiddev', label: 'Waleed vs Sufiyan (#1)' },
-                  { a: 'waleedcodes', b: 'torvalds', label: 'Waleed vs Torvalds' },
-                  { a: 'antfu', b: 'sindresorhus', label: 'Anthony Fu vs Sindre' }
+                  { a: 'torvalds', b: 'gaearon', label: 'Torvalds vs Dan Abramov' },
+                  { a: 'antfu', b: 'sindresorhus', label: 'Anthony Fu vs Sindre' },
+                  { a: 'yyx990803', b: 'tj', label: 'Evan You vs TJ Holowaychuk' }
                 ].map((preset) => (
                   <button
                     key={`${preset.a}-${preset.b}`}

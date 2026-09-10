@@ -1,3 +1,4 @@
+// [Commity Core Phase 1: Setup] leaderboard.js
 const express = require('express');
 const router = express.Router();
 

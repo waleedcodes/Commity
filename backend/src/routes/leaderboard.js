@@ -124,4 +124,13 @@ router.get('/user/:username/rank',
   LeaderboardController.getUserRanking
 );
 
+/**
+ * @route   POST /api/leaderboard/sync-region
+ * @desc    Force sync regional ranks from committers.top official data
+ * @access  Public
+ */
+router.post('/sync-region',
+  LeaderboardController.syncRegionRanks
+);
+
 module.exports = router;

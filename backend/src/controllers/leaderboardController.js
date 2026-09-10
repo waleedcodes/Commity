@@ -536,6 +536,9 @@ class LeaderboardController {
     const categoryList = categories.split(',');
     const rankings = {};
 
+    const total = await User.countDocuments({ isActive: true, accountType: { $ne: 'Organization' } });
+    const MIN_USERS = 5;
+
     for (const category of categoryList) {
       let field;
       switch (category.trim()) {
@@ -555,13 +558,24 @@ class LeaderboardController {
           continue;
       }
 
+      if (total < MIN_USERS) {
+        // Not enough data — return stored rank instead of computing a misleading one
+        rankings[category.trim()] = {
+          rank: user.globalRank || null,
+          total,
+          percentile: null,
+          value: user[field] || 0,
+          category: category.trim(),
+        };
+        continue;
+      }
+
       const rank = await User.countDocuments({
         [field]: { $gt: user[field] },
         isActive: true,
         accountType: { $ne: 'Organization' },
       }) + 1;
 
-      const total = await User.countDocuments({ isActive: true, accountType: { $ne: 'Organization' } });
       const percentile = Math.round((1 - (rank - 1) / total) * 100);
 
       rankings[category.trim()] = {
@@ -575,27 +589,47 @@ class LeaderboardController {
 
     // Get user's position in location-based leaderboard if location exists
     if (user.location) {
-      const locationRank = await User.countDocuments({
-        totalCommits: { $gt: user.totalCommits },
-        location: { $regex: user.location, $options: 'i' },
-        isActive: true,
-        accountType: { $ne: 'Organization' },
-      }) + 1;
+      // Prefer authoritative committers.top country rank when available
+      if (user.countryRankAll || user.countryRank) {
+        const locationTotal = await User.countDocuments({
+          location: { $regex: user.location, $options: 'i' },
+          isActive: true,
+          accountType: { $ne: 'Organization' },
+        });
 
-      const locationTotal = await User.countDocuments({
-        location: { $regex: user.location, $options: 'i' },
-        isActive: true,
-        accountType: { $ne: 'Organization' },
-      });
+        const storedRank = user.countryRankAll || user.countryRank;
+        rankings.location = {
+          rank: storedRank,
+          total: locationTotal,
+          percentile: locationTotal > 0 ? Math.round((1 - (storedRank - 1) / Math.max(locationTotal, storedRank)) * 100) : null,
+          value: user.totalCommits,
+          category: 'location',
+          locationName: user.location,
+          source: user.countryRankAll ? 'committers.top' : 'calculated',
+        };
+      } else {
+        const locationRank = await User.countDocuments({
+          totalCommits: { $gt: user.totalCommits },
+          location: { $regex: user.location, $options: 'i' },
+          isActive: true,
+          accountType: { $ne: 'Organization' },
+        }) + 1;
 
-      rankings.location = {
-        rank: locationRank,
-        total: locationTotal,
-        percentile: Math.round((1 - (locationRank - 1) / locationTotal) * 100),
-        value: user.totalCommits,
-        category: 'location',
-        locationName: user.location,
-      };
+        const locationTotal = await User.countDocuments({
+          location: { $regex: user.location, $options: 'i' },
+          isActive: true,
+          accountType: { $ne: 'Organization' },
+        });
+
+        rankings.location = {
+          rank: locationTotal >= MIN_USERS ? locationRank : null,
+          total: locationTotal,
+          percentile: locationTotal >= MIN_USERS ? Math.round((1 - (locationRank - 1) / locationTotal) * 100) : null,
+          value: user.totalCommits,
+          category: 'location',
+          locationName: user.location,
+        };
+      }
     }
 
     res.json({
@@ -833,6 +867,31 @@ class LeaderboardController {
       data: snapshots,
       region,
       totalSnapshots: snapshots.length,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Force sync regional ranks from committers.top official data
+   * @route   POST /api/leaderboard/sync-region
+   * @access  Public
+   */
+  static syncRegionRanks = asyncHandler(async (req, res) => {
+    const { countryKey = 'pakistan', countryName = 'Pakistan' } = req.body || req.query || {};
+    const CommittersService = require('../services/committersService');
+
+    logger.info(`[syncRegionRanks] Triggering official committers.top sync for '${countryName}'...`);
+
+    const result = await CommittersService.syncRegion(countryKey, countryName);
+
+    // Invalidate cached data so the next request returns fresh ranks
+    CacheManager.del(CACHE_KEYS.LEADERBOARD, 'featured_developers_v2');
+    CacheManager.del(CACHE_KEYS.LEADERBOARD, 'leaderboard_regions_v2');
+
+    res.json({
+      success: true,
+      message: `Successfully synced official committers.top rankings for ${countryName}`,
+      data: result,
       timestamp: new Date().toISOString(),
     });
   });

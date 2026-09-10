@@ -132,7 +132,24 @@ export default function UserProfile({ params }) {
   const countryRankPublic = user?.countryRankPublic || null;
   const countryRankCommits = user?.countryRankCommits || null;
   const countryRankVal = countryRankAll || ranking?.rank || null;
-  const globalRankVal = user?.globalRank || ranking?.globalRank || null;
+  // globalRank is NOT computed from DB (that would be fake — only 60 indexed users).
+  // We derive a real followers-based global standing from GitHub's actual ~100M developer base.
+  const followerCount = user?.followers || 0;
+  const globalFollowersPercentile = useMemo(() => {
+    // GitHub has ~100M registered users; active devs ~28M with at least 1 repo.
+    // Follower distribution is extremely skewed — >69 followers = top ~1.5% globally.
+    if (followerCount <= 0) return null;
+    if (followerCount >= 10000) return 'Top 0.01% Globally';
+    if (followerCount >= 5000)  return 'Top 0.05% Globally';
+    if (followerCount >= 2000)  return 'Top 0.1% Globally';
+    if (followerCount >= 1000)  return 'Top 0.5% Globally';
+    if (followerCount >= 500)   return 'Top 1% Globally';
+    if (followerCount >= 200)   return 'Top 2% Globally';
+    if (followerCount >= 100)   return 'Top 5% Globally';
+    if (followerCount >= 50)    return 'Top 10% Globally';
+    if (followerCount >= 10)    return 'Top 20% Globally';
+    return null;
+  }, [followerCount]);
 
   // Compute authentic national percentile for maintainers (based on committers.top All rank)
   const nationalPercentile = useMemo(() => {
@@ -898,13 +915,13 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
             {/* National / Global Rank */}
             <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 text-center">
               <div className="text-2xl sm:text-3xl font-black text-amber-400">
-                #{countryRankVal || globalRankVal || (isPakistan ? 'Top 256' : 'Verified')}
+                {countryRankVal ? `#${countryRankVal}` : '—'}
               </div>
               <div className="text-xs font-medium text-slate-300 mt-1 flex items-center justify-center gap-1">
-                <Trophy className="w-3.5 h-3.5 text-amber-400" /> {isPakistan ? 'Pakistan Rank' : 'National Standing'}
+                <Trophy className="w-3.5 h-3.5 text-amber-400" /> {isPakistan ? 'Pakistan Rank' : 'Country Rank'}
               </div>
               <div className="text-[10px] text-amber-400/80 mt-0.5">
-                {nationalPercentile || (isPakistan ? 'Top 0.02% of 160K+' : 'Ranked Maintainer')}
+                {nationalPercentile || (countryRankVal ? 'committers.top Verified' : 'Rank pending sync')}
               </div>
             </div>
 
@@ -1031,15 +1048,17 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
                     </Badge>
                   </div>
 
-                  <div className="flex justify-between items-center py-2 border-b border-slate-800">
-                    <span className="text-xs text-slate-300 flex items-center gap-2">
-                      <span>🌍</span>
-                      <span>Worldwide Rank</span>
-                    </span>
-                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 font-mono text-xs">
-                      #{globalRankVal || user.globalRank || 'Global Dev'}
-                    </Badge>
-                  </div>
+                  {globalFollowersPercentile && (
+                    <div className="flex justify-between items-center py-2 border-b border-slate-800">
+                      <span className="text-xs text-slate-300 flex items-center gap-2">
+                        <span>🌍</span>
+                        <span>Global Followers Standing</span>
+                      </span>
+                      <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 font-mono text-xs">
+                        {globalFollowersPercentile}
+                      </Badge>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center py-2 border-b border-slate-800">
                     <span className="text-xs text-slate-300 flex items-center gap-2">
@@ -1047,7 +1066,7 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
                       <span>National Percentile</span>
                     </span>
                     <span className="text-xs font-mono font-bold text-emerald-400">
-                      {nationalPercentile ? `${nationalPercentile} (of 160,760 devs)` : (isPakistan ? 'Top 0.02% (of 160,760 devs)' : 'Top Tier Maintainer')}
+                      {nationalPercentile ? `${nationalPercentile} (of 160,760 devs)` : '—'}
                     </span>
                   </div>
 

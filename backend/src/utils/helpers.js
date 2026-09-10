@@ -427,6 +427,71 @@ class Helpers {
     const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
     return Math.sqrt(avgSquareDiff);
   }
+
+  /**
+   * Normalize country name from freeform location string
+   * @param {string} location
+   * @returns {string|null}
+   */
+  static normalizeCountry(location) {
+    if (!location || typeof location !== 'string') return null;
+    const clean = location.trim();
+    if (!clean || /^(undefined|null|none|n\/a|\?|-)$/i.test(clean)) return null;
+
+    const lower = clean.toLowerCase();
+
+    // Known country keywords / aliases & major tech hubs
+    if (/\b(pakistan|pk)\b/i.test(lower) || /\b(karachi|lahore|islamabad|rawalpindi|abbottabad|faisalabad|multan|peshawar|quetta|sialkot|gujranwala)\b/i.test(lower)) {
+      return 'Pakistan';
+    }
+    if (/\b(united states|usa|u\.s\.a|u\.s\.|us)\b/i.test(lower) || /\b(california|new york|san francisco|seattle|austin|chicago|boston|los angeles|texas|washington|silicon valley)\b/i.test(lower)) {
+      return 'United States';
+    }
+    if (/\b(india|in)\b/i.test(lower) || /\b(bangalore|bengaluru|delhi|mumbai|pune|hyderabad|chennai|noida|gurgaon)\b/i.test(lower)) {
+      return 'India';
+    }
+    if (/\b(united kingdom|uk|u\.k\.|england|scotland|wales|london)\b/i.test(lower)) {
+      return 'United Kingdom';
+    }
+    if (/\b(germany|deutschland|berlin|munich|hamburg)\b/i.test(lower)) {
+      return 'Germany';
+    }
+    if (/\b(canada|toronto|vancouver|montreal|ontario|quebec)\b/i.test(lower)) {
+      return 'Canada';
+    }
+    if (/\b(france|paris)\b/i.test(lower)) {
+      return 'France';
+    }
+    if (/\b(japan|tokyo)\b/i.test(lower)) {
+      return 'Japan';
+    }
+    if (/\b(china|beijing|shanghai|shenzhen|hangzhou)\b/i.test(lower)) {
+      return 'China';
+    }
+    if (/\b(australia|sydney|melbourne|brisbane)\b/i.test(lower)) {
+      return 'Australia';
+    }
+    if (/\b(brazil|brasil|sao paulo|rio de janeiro)\b/i.test(lower)) {
+      return 'Brazil';
+    }
+    if (/\b(netherlands|amsterdam|rotterdam)\b/i.test(lower)) {
+      return 'Netherlands';
+    }
+    if (/\b(singapore)\b/i.test(lower)) {
+      return 'Singapore';
+    }
+
+    // Fallback: If formatted as "City, Country", take the last segment
+    if (clean.includes(',')) {
+      const parts = clean.split(',');
+      const candidate = parts[parts.length - 1].trim();
+      if (candidate && candidate.length > 1 && !/^(undefined|null)$/i.test(candidate)) {
+        return candidate.replace(/\b\w/g, c => c.toUpperCase());
+      }
+    }
+
+    return clean.replace(/\b\w/g, c => c.toUpperCase());
+  }
 }
 
 module.exports = Helpers;

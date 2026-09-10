@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] leaderboard.js
+// [Commity Core Phase 2: Logic] leaderboard.js
 const express = require('express');
 const router = express.Router();
 
@@ -89,40 +89,3 @@ router.get('/location/:location',
   LeaderboardController.getLeaderboardByLocation
 );
 
-/**
- * @route   GET /api/leaderboard/language/:language
- * @desc    Get leaderboard filtered by programming language
- * @access  Public
- */
-router.get('/language/:language',
-  validateLeaderboardQuery,
-  LeaderboardController.getLeaderboardByLanguage
-);
-
-/**
- * @route   GET /api/leaderboard/trending
- * @desc    Get trending contributors
- * @access  Public
- */
-router.get('/trending',
-  validateLeaderboardQuery,
-  LeaderboardController.getTopContributors
-);
-
-/**
- * @route   GET /api/leaderboard/user/:username
- * @route   GET /api/leaderboard/user/:username/rank
- * @desc    Get specific user's ranking across different categories
- * @access  Public
- */
-router.get('/user/:username',
-  validateLeaderboardQuery,
-  LeaderboardController.getUserRanking
-);
-
-router.get('/user/:username/rank',
-  validateLeaderboardQuery,
-  LeaderboardController.getUserRanking
-);
-
-module.exports = router;

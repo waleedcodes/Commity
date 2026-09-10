@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] page.js
+// [Commity Core Phase 2: Logic] page.js
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -235,8 +235,8 @@ export default function ProfileHub() {
 
   // Compare Modal State
   const [compareModalOpen, setCompareModalOpen] = useState(false);
-  const [compareUserA, setCompareUserA] = useState('waleedcodes');
-  const [compareUserB, setCompareUserB] = useState('sufiyanshahiddev');
+  const [compareUserA, setCompareUserA] = useState('');
+  const [compareUserB, setCompareUserB] = useState('');
   const [modalShowBadges, setModalShowBadges] = useState(false);
   const [modalCompareTheme, setModalCompareTheme] = useState('default');
   const [modalCopiedMarkdown, setModalCopiedMarkdown] = useState(false);
@@ -269,7 +269,18 @@ export default function ProfileHub() {
   useEffect(() => {
     let isMounted = true;
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
-    fetch(`${API_URL}/users/waleedcodes`)
+    let target = 'waleedcodes';
+    try {
+      const saved = localStorage.getItem('commity_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.username) target = parsed.username;
+      }
+    } catch {
+      // ignore
+    }
+
+    fetch(`${API_URL}/users/${target}`)
       .then(r => r.json())
       .then(json => {
         if (!isMounted) return;
@@ -308,11 +319,11 @@ export default function ProfileHub() {
           const mapped = raw.map((u, idx) => ({
             username: u.username || u.login,
             name: u.name || u.username,
-            role: (u.username === 'waleedcodes') ? 'Full-Stack Developer' : 'Open Source Maintainer',
-            location: (u.username === 'waleedcodes') ? 'Abbottabad, Pakistan' : (u.location || selectedCity),
+            role: u.bio ? u.bio.split(/[|•·]/)[0].trim() : 'Software Engineer',
+            location: u.location || selectedCity,
             flag: '🇵🇰',
-            rank: `#${u.countryRank || u.rank || (idx + 1)} ${selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1)}`,
-            rankNum: u.countryRank || u.rank || (idx + 1),
+            rank: `#${u.countryRankAll || u.countryRank || u.rank || (idx + 1)} ${selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1)}`,
+            rankNum: u.countryRankAll || u.countryRank || u.rank || (idx + 1),
             avatar: u.avatarUrl || u.avatar_url || `https://avatars.githubusercontent.com/u/${u.githubId}?v=4`,
             contributions: (u.totalContributions || 0) > 0 ? u.totalContributions : ((u.publicContributions || 0) + (u.privateContributions || 0)),
             publicContribs: u.publicContributions || u.totalContributions || 0,
@@ -365,23 +376,22 @@ export default function ProfileHub() {
       const publicC = u.publicContributions || u.totalContributions || 0;
       const privateC = u.privateContributions || 0;
       const totalC = (u.totalContributions || 0) > 0 ? u.totalContributions : (publicC + privateC);
-
-      // Extract primary language
       const primLang = u.topLanguages?.[0]?.name || 'TypeScript';
+      const officialRank = u.countryRankAll || u.countryRank || u.rank || (idx + 1);
 
       return {
         username: u.username || u.login,
         name: u.name || u.username,
-        role: u.username === 'waleedcodes' ? 'Full-Stack Developer' : 'Open Source Maintainer',
-        location: u.username === 'waleedcodes' ? 'Abbottabad, Pakistan' : (u.location || 'Pakistan'),
+        role: u.bio ? u.bio.split(/[|•·]/)[0].trim() : 'Software Engineer',
+        location: u.location || 'Pakistan',
         flag: '🇵🇰',
-        rank: `#${u.countryRank || u.rank || (idx + 1)} Pakistan`,
-        rankNum: u.countryRank || u.rank || (idx + 1),
+        rank: `#${officialRank} Pakistan`,
+        rankNum: officialRank,
         avatar: u.avatarUrl || u.avatar_url || `https://avatars.githubusercontent.com/u/${u.githubId}?v=4`,
         contributions: totalC,
         publicContribs: publicC,
         privateContribs: privateC,
-        followers: u.followers || 69,
+        followers: u.followers || 0,
         repos: u.publicRepos || 0,
         streak: u.contributionStreak || 0,
         lang: primLang,
@@ -405,9 +415,8 @@ export default function ProfileHub() {
 
     PAKISTAN_CITIES.forEach(c => {
       if (c.id === 'all') return;
-      const inPk = pakistanMaintainers.filter(u => 
-        (u.location || '').toLowerCase().includes(c.id.toLowerCase()) ||
-        (c.id === 'abbottabad' && u.username === 'waleedcodes')
+      const inPk = pakistanMaintainers.filter(u =>
+        (u.location || '').toLowerCase().includes(c.id.toLowerCase())
       );
       const inCityData = cityData[c.id] || [];
       const combined = new Set([...inPk.map(u => u.username), ...inCityData.map(u => u.username)]);
@@ -423,9 +432,8 @@ export default function ProfileHub() {
     if (selectedCity === 'all') {
       list = [...pakistanMaintainers];
     } else {
-      const fromPk = pakistanMaintainers.filter((u) => 
-        (u.location || '').toLowerCase().includes(selectedCity.toLowerCase()) ||
-        (selectedCity === 'abbottabad' && u.username === 'waleedcodes')
+      const fromPk = pakistanMaintainers.filter((u) =>
+        (u.location || '').toLowerCase().includes(selectedCity.toLowerCase())
       );
       const fromCity = cityData[selectedCity] || [];
       const userMap = new Map();
@@ -483,8 +491,8 @@ export default function ProfileHub() {
       role: 'Software Engineer',
       location: u.location || 'Global',
       flag: (u.location || '').toLowerCase().includes('pakistan') ? '🇵🇰' : '🌍',
-      rank: `#${u.countryRank || u.globalRank || (idx + 1)}`,
-      rankNum: u.countryRank || u.globalRank || (idx + 1),
+      rank: u.countryRankAll || u.countryRank ? `#${u.countryRankAll || u.countryRank}` : `#${idx + 1}`,
+      rankNum: u.countryRankAll || u.countryRank || (idx + 1),
       avatar: u.avatarUrl || u.avatar_url,
       contributions: u.totalContributions || u.totalCommits || 0,
       publicContribs: u.publicContributions || u.totalContributions || 0,
@@ -502,8 +510,8 @@ export default function ProfileHub() {
   const [compareDataB, setCompareDataB] = useState(null);
   const [compareLoading, setCompareLoading] = useState(false);
   const [compareError, setCompareError] = useState(null);
-  const [modalUserA, setModalUserA] = useState('waleedcodes');
-  const [modalUserB, setModalUserB] = useState('sufiyanshahiddev');
+  const [modalUserA, setModalUserA] = useState('');
+  const [modalUserB, setModalUserB] = useState('');
 
   // Fetch 100% authentic GitHub streak and profile data for Compare Modal
   const fetchCompareModalData = useCallback(async (uA, uB) => {
@@ -591,8 +599,10 @@ export default function ProfileHub() {
 
   // Open Compare Modal with 2 users
   const handleOpenCompare = (userHandle) => {
-    const uA = 'waleedcodes';
-    const uB = userHandle === 'waleedcodes' ? 'sufiyanshahiddev' : userHandle;
+    // Use the top-ranked user from the current list as User A (if not clicking on them)
+    const topUser = activeDisplayList[0]?.username || '';
+    const uA = userHandle === topUser ? (activeDisplayList[1]?.username || userHandle) : topUser;
+    const uB = userHandle;
     setCompareUserA(uA);
     setCompareUserB(uB);
     setModalUserA(uA);
@@ -755,16 +765,18 @@ export default function ProfileHub() {
 
             {/* Quick Actions Header */}
             <div className="flex items-center gap-2.5">
-              <Link href="/profile/waleedcodes">
-                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-500/20 h-10 px-4">
-                  <Avatar className="w-5 h-5 mr-2 ring-1 ring-white/40">
-                    <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="waleedcodes" />
-                    <AvatarFallback>WI</AvatarFallback>
-                  </Avatar>
-                  <span>@waleedcodes</span>
-                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                </Button>
-              </Link>
+              {featuredProfile?.username && (
+                <Link href={`/profile/${featuredProfile.username}`}>
+                  <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-500/20 h-10 px-4">
+                    <Avatar className="w-5 h-5 mr-2 ring-1 ring-white/40">
+                      <AvatarImage src={featuredProfile.avatarUrl} alt={featuredProfile.username} />
+                      <AvatarFallback>{featuredProfile.username.slice(0,2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <span>@{featuredProfile.username}</span>
+                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -833,8 +845,10 @@ export default function ProfileHub() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
               <div className="relative">
                 <Avatar className="w-20 h-20 sm:w-24 sm:h-24 ring-4 ring-amber-400/80 shadow-2xl shrink-0">
-                  <AvatarImage src="https://avatars.githubusercontent.com/u/110061477?v=4" alt="waleedcodes" />
-                  <AvatarFallback className="text-xl font-bold bg-slate-800 text-slate-200">WI</AvatarFallback>
+                  <AvatarImage src={featuredProfile?.avatarUrl} alt={featuredProfile?.username} />
+                  <AvatarFallback className="text-xl font-bold bg-slate-800 text-slate-200">
+                    {featuredProfile?.username?.slice(0,2).toUpperCase() || '??'}
+                  </AvatarFallback>
                 </Avatar>
                 {featuredRank && (
                   <div className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] shadow-lg flex items-center gap-1">
@@ -845,8 +859,8 @@ export default function ProfileHub() {
 
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-2xl font-black text-white">{featuredProfile?.name || 'Waleed Ishfaq'}</h3>
-                  <span className="text-sm text-blue-400 font-mono">@{featuredProfile?.username || 'waleedcodes'}</span>
+                  <h3 className="text-2xl font-black text-white">{featuredProfile?.name || featuredProfile?.username || 'Featured Maintainer'}</h3>
+                  <span className="text-sm text-blue-400 font-mono">@{featuredProfile?.username || 'maintainer'}</span>
                   {featuredRank && (
                     <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[11px] font-semibold py-0.5">
                       👑 #{featuredRank} PK (All)
@@ -867,7 +881,7 @@ export default function ProfileHub() {
                   </Badge>
                 </div>
                 <p className="text-xs sm:text-sm text-slate-300">
-                  Full-Stack Software Engineer • Abbottabad, Pakistan 🇵🇰
+                  {featuredProfile?.bio?.split(/[|•·]/)[0]?.trim() || 'Software Engineer'} • {featuredProfile?.location || 'Pakistan'} 🇵🇰
                 </p>
                 <p className="text-xs text-slate-400 max-w-2xl leading-relaxed">
                   {featuredRank ? `Top ${(featuredRank / 160760 * 100).toFixed(3)}% ranked developer out of 160,760 in Pakistan. ` : ''}
@@ -899,7 +913,7 @@ export default function ProfileHub() {
               </div>
 
               <div className="flex flex-col gap-2">
-                <Link href="/profile/waleedcodes">
+                <Link href={`/profile/${featuredProfile?.username || ''}`}>
                   <Button className="w-full h-11 px-5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shadow-lg shadow-amber-500/20">
                     <span>Open Full Profile</span>
                     <ArrowRight className="w-4 h-4 ml-1.5" />
@@ -1197,14 +1211,14 @@ export default function ProfileHub() {
                 const pubC = dev.publicContribs || totalC;
                 const privC = dev.privateContribs || (totalC > pubC ? totalC - pubC : 0);
                 const pubRatio = totalC > 0 ? Math.round((pubC / totalC) * 100) : 100;
-                const isWaleed = dev.username === 'waleedcodes';
+                const isTopRanked = dev.rankNum <= 3;
 
                 return (
                   <Card 
                     key={dev.username}
                     className={`border transition-all group backdrop-blur-sm flex flex-col justify-between ${
-                      isWaleed 
-                        ? 'bg-gradient-to-b from-blue-950/40 to-slate-900/90 border-blue-500/50 ring-1 ring-blue-500/30' 
+                      isTopRanked
+                        ? 'bg-gradient-to-b from-amber-950/30 to-slate-900/90 border-amber-500/40 ring-1 ring-amber-500/20'
                         : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
                     }`}
                   >
@@ -1214,7 +1228,7 @@ export default function ProfileHub() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="relative">
                           <Avatar className={`w-13 h-13 ring-2 transition-all ${
-                            isWaleed ? 'ring-amber-400 shadow-md shadow-amber-500/20' : 'ring-slate-700 group-hover:ring-blue-500'
+                            isTopRanked ? 'ring-amber-400 shadow-md shadow-amber-500/20' : 'ring-slate-700 group-hover:ring-blue-500'
                           }`}>
                             <AvatarImage src={dev.avatar} alt={dev.username} />
                             <AvatarFallback>{dev.username.slice(0, 2).toUpperCase()}</AvatarFallback>
@@ -1227,7 +1241,7 @@ export default function ProfileHub() {
                         <Badge 
                           variant="outline" 
                           className={`text-[10px] font-mono shrink-0 ${
-                            isWaleed ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'border-slate-700 text-slate-300'
+                            isTopRanked ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'border-slate-700 text-slate-300'
                           }`}
                         >
                           {dev.rank}
@@ -1317,670 +1331,3 @@ export default function ProfileHub() {
                       <th className="py-3.5 px-4 text-center">Tech Stack</th>
                       <th className="py-3.5 px-4 text-right">Actions</th>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/80">
-                    {activeDisplayList.map((dev) => (
-                      <tr 
-                        key={dev.username} 
-                        className={`hover:bg-slate-800/40 transition-colors ${
-                          dev.username === 'waleedcodes' ? 'bg-blue-950/20' : ''
-                        }`}
-                      >
-                        <td className="py-3.5 px-4 font-mono font-bold text-amber-400">
-                          {dev.rank}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="w-8 h-8 ring-1 ring-slate-700">
-                              <AvatarImage src={dev.avatar} alt={dev.username} />
-                              <AvatarFallback>{dev.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <Link href={`/profile/${dev.username}`} className="font-bold text-white hover:text-blue-400 transition-colors block">
-                                {dev.name}
-                              </Link>
-                              <span className="text-[11px] text-slate-400 font-mono">@{dev.username}</span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-300">
-                          <span className="mr-1.5">{dev.flag}</span>
-                          <span>{dev.location}</span>
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono font-extrabold text-white text-sm">
-                          {formatNumber(dev.contributions)}
-                        </td>
-                        <td className="py-3.5 px-4 text-right font-mono text-slate-300">
-                          {formatNumber(dev.followers)}
-                        </td>
-                        <td className="py-3.5 px-4 text-center">
-                          <Badge variant="outline" className="text-[10px] border-slate-700 text-slate-300">
-                            {dev.lang}
-                          </Badge>
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => handleOpenCompare(dev.username)}
-                              className="text-xs h-8 px-2 text-slate-400 hover:text-white"
-                            >
-                              <Scale className="w-3.5 h-3.5" />
-                            </Button>
-                            <Link href={`/profile/${dev.username}`}>
-                              <Button size="sm" className="h-8 px-3 text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold">
-                                View
-                              </Button>
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Qualification & Live Badge Generator Widget */}
-        <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/80 border border-slate-800 backdrop-blur-md space-y-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div>
-              <div className="inline-flex items-center gap-1.5 text-xs text-indigo-400 font-semibold mb-1">
-                <ShieldCheck className="w-4 h-4" />
-                <span>Regional Verification Engine</span>
-              </div>
-              <h3 className="text-xl sm:text-2xl font-black text-white">
-                Check Your Pakistan Top 256 Standing
-              </h3>
-              <p className="text-xs text-slate-400 mt-1 max-w-xl">
-                Enter your GitHub handle to test if you meet the 69+ follower qualification requirement and see your dynamic SVG README badge.
-              </p>
-            </div>
-
-            <form onSubmit={handleCheckQualification} className="flex items-center gap-2 w-full md:w-auto">
-              <Input
-                type="text"
-                placeholder="Your GitHub username..."
-                value={checkUsername}
-                onChange={(e) => setCheckUsername(e.target.value)}
-                className="w-full md:w-64 bg-slate-950 border-slate-700 text-sm h-11"
-              />
-              <Button 
-                type="submit" 
-                disabled={isChecking}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs h-11 px-5 shrink-0"
-              >
-                {isChecking ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'Check Status'}
-              </Button>
-            </form>
-          </div>
-
-          {/* Qualification Result Box */}
-          {checkResult && (
-            <div className="p-5 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-4 animate-in fade-in duration-300">
-              {checkResult.error ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center text-lg shrink-0">
-                    ℹ️
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-white text-sm flex items-center gap-2">
-                      <span>@{checkResult.username}</span>
-                      <Badge className="bg-amber-500/20 text-amber-300">Verification Notice</Badge>
-                    </h4>
-                    <p className="text-xs text-slate-300 mt-0.5">{checkResult.error}</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${
-                        checkResult.isQualified ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
-                      }`}>
-                        {checkResult.isQualified ? '✅' : '⏳'}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-white text-base flex items-center gap-2">
-                          <span>@{checkResult.username}</span>
-                          <Badge className={checkResult.isQualified ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}>
-                            {checkResult.isQualified ? 'Qualified for Top 256' : 'Building Momentum'}
-                          </Badge>
-                        </h4>
-                        <p className="text-xs text-slate-400">
-                          {checkResult.followers} Followers (Threshold: &ge; 69) • Rank: {checkResult.rank}
-                        </p>
-                      </div>
-                    </div>
-
-                    <Link href={`/profile/${checkResult.username}`}>
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-500 text-white text-xs">
-                        View Verified Profile &rarr;
-                      </Button>
-                    </Link>
-                  </div>
-
-                  {/* Dynamic Badge Embed Preview */}
-                  <div className="pt-3 border-t border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold block">
-                        Dynamic SVG Badge for README.md
-                      </span>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={checkResult.badgeUrl} 
-                        alt="Commity Badge" 
-                        className="h-7 max-w-full"
-                      />
-                    </div>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const appBase = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
-                        const md = `[![Commity Rank](${checkResult.badgeUrl})](${appBase}/profile/${checkResult.username})`;
-                        navigator.clipboard.writeText(md);
-                        setCopiedBadge(true);
-                        setTimeout(() => setCopiedBadge(false), 2000);
-                      }}
-                      className="border-slate-700 bg-slate-900 text-xs text-slate-300"
-                    >
-                      {copiedBadge ? <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 mr-1.5" />}
-                      {copiedBadge ? 'Copied Markdown!' : 'Copy Badge Markdown'}
-                    </Button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-          </>
-        )}
-      </main>
-
-      {/* Head-to-Head Comparison Modal (Zero Mock Data - 100% Real GitHub API) */}
-      {compareModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <div className="flex items-center gap-2">
-                <Scale className="w-5 h-5 text-amber-400" />
-                <h3 className="text-xl font-bold text-white">Developer Head-to-Head & Streak Compare</h3>
-              </div>
-              <button 
-                onClick={() => setCompareModalOpen(false)}
-                className="w-8 h-8 rounded-lg bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Change Compared Developers Bar */}
-            <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
-              <div className="flex items-center gap-2">
-                <Input
-                  type="text"
-                  value={modalUserA}
-                  onChange={(e) => setModalUserA(e.target.value)}
-                  placeholder="User A (e.g. waleedcodes)"
-                  className="bg-slate-900 border-slate-700 text-xs text-white h-9"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const temp = modalUserA;
-                    setModalUserA(modalUserB);
-                    setModalUserB(temp);
-                    fetchCompareModalData(modalUserB, temp);
-                  }}
-                  className="border-slate-700 bg-slate-900 text-slate-300 h-9 px-2.5 shrink-0"
-                  title="Swap"
-                >
-                  <ArrowLeftRight className="w-3.5 h-3.5" />
-                </Button>
-                <Input
-                  type="text"
-                  value={modalUserB}
-                  onChange={(e) => setModalUserB(e.target.value)}
-                  placeholder="User B (e.g. sufiyanshahiddev)"
-                  className="bg-slate-900 border-slate-700 text-xs text-white h-9"
-                />
-                <Button
-                  size="sm"
-                  disabled={compareLoading || !modalUserA.trim() || !modalUserB.trim()}
-                  onClick={() => fetchCompareModalData(modalUserA, modalUserB)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs h-9 px-3 shrink-0"
-                >
-                  {compareLoading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : 'Compare'}
-                </Button>
-              </div>
-
-              {/* Quick Preset Matchups */}
-              <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
-                <span>Presets:</span>
-                {[
-                  { a: 'waleedcodes', b: 'sufiyanshahiddev', label: 'Waleed vs Sufiyan (#1)' },
-                  { a: 'waleedcodes', b: 'torvalds', label: 'Waleed vs Torvalds' },
-                  { a: 'antfu', b: 'sindresorhus', label: 'Anthony Fu vs Sindre' }
-                ].map((preset) => (
-                  <button
-                    key={`${preset.a}-${preset.b}`}
-                    type="button"
-                    onClick={() => {
-                      setModalUserA(preset.a);
-                      setModalUserB(preset.b);
-                      fetchCompareModalData(preset.a, preset.b);
-                    }}
-                    className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
-                  >
-                    {preset.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {compareError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-                {compareError}
-              </div>
-            )}
-
-            {/* Loading Skeleton */}
-            {compareLoading ? (
-              <div className="py-12 text-center space-y-3">
-                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
-                <p className="text-xs text-slate-400">
-                  Calculating real GraphQL contribution streaks for @{modalUserA} and @{modalUserB}...
-                </p>
-              </div>
-            ) : compareDataA && compareDataB ? (
-              <>
-                {/* Compared Developers Header */}
-                <div className="grid grid-cols-2 gap-4 text-center">
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-blue-500/30 space-y-2">
-                    <Avatar className="w-16 h-16 mx-auto ring-2 ring-blue-500">
-                      <AvatarImage src={compareDataA.avatar} alt={compareDataA.username} />
-                      <AvatarFallback>{compareDataA.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h4 className="font-bold text-white text-base truncate">{compareDataA.name}</h4>
-                      <p className="text-xs text-blue-400 font-mono">@{compareDataA.username}</p>
-                      <Badge className="mt-1 text-[10px] bg-blue-500/20 text-blue-300">{compareDataA.rank}</Badge>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-indigo-500/30 space-y-2">
-                    <Avatar className="w-16 h-16 mx-auto ring-2 ring-indigo-500">
-                      <AvatarImage src={compareDataB.avatar} alt={compareDataB.username} />
-                      <AvatarFallback>{compareDataB.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h4 className="font-bold text-white text-base truncate">{compareDataB.name}</h4>
-                      <p className="text-xs text-indigo-400 font-mono">@{compareDataB.username}</p>
-                      <Badge className="mt-1 text-[10px] bg-indigo-500/20 text-indigo-300">{compareDataB.rank}</Badge>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Category Verdicts Summary Card */}
-                {(() => {
-                  const verdicts = getVerdicts(compareDataA, compareDataB);
-                  if (!verdicts) return null;
-                  return (
-                    <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-950 to-blue-500/10 border border-amber-500/30 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Crown className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
-                            Category Verdicts
-                          </h4>
-                        </div>
-                        <Badge className="bg-amber-500/20 text-amber-300 text-[10px] font-mono border-amber-500/30">
-                          Live GitHub Data
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                        <div className="p-2.5 rounded-xl bg-slate-950 border border-amber-500/30 space-y-0.5">
-                          <div className="flex items-center gap-1 text-[10px] text-amber-400 font-semibold">
-                            <Flame className="w-3 h-3" />
-                            <span>Streak Champ</span>
-                          </div>
-                          <p className="text-xs font-black text-white truncate">@{verdicts.streakWinner.username}</p>
-                          <p className="text-[10px] text-amber-300 font-mono">+{formatNumber(verdicts.streakDiff)}d lead</p>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-slate-950 border border-blue-500/30 space-y-0.5">
-                          <div className="flex items-center gap-1 text-[10px] text-blue-400 font-semibold">
-                            <Zap className="w-3 h-3" />
-                            <span>Volume Champ</span>
-                          </div>
-                          <p className="text-xs font-black text-white truncate">@{verdicts.volumeWinner.username}</p>
-                          <p className="text-[10px] text-blue-300 font-mono">+{formatNumber(verdicts.volumeDiff)} commits</p>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-slate-950 border border-indigo-500/30 space-y-0.5">
-                          <div className="flex items-center gap-1 text-[10px] text-indigo-400 font-semibold">
-                            <Users className="w-3 h-3" />
-                            <span>Follower Leader</span>
-                          </div>
-                          <p className="text-xs font-black text-white truncate">@{verdicts.followerWinner.username}</p>
-                          <p className="text-[10px] text-indigo-300 font-mono">+{formatNumber(verdicts.followerDiff)} fans</p>
-                        </div>
-
-                        <div className="p-2.5 rounded-xl bg-slate-950 border border-purple-500/30 space-y-0.5">
-                          <div className="flex items-center gap-1 text-[10px] text-purple-400 font-semibold">
-                            <FolderGit2 className="w-3 h-3" />
-                            <span>Codebase Leader</span>
-                          </div>
-                          <p className="text-xs font-black text-white truncate">@{verdicts.repoWinner.username}</p>
-                          <p className="text-[10px] text-purple-300 font-mono">+{verdicts.repoDiff} repos</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* Compare Action Toolbar */}
-                <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-2xl bg-slate-950 border border-slate-800">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setModalShowBadges(!modalShowBadges)}
-                    className="border-slate-700 bg-slate-900 text-xs text-slate-200 h-8 px-2.5"
-                  >
-                    <Palette className="w-3.5 h-3.5 mr-1.5 text-amber-400" />
-                    <span>{modalShowBadges ? 'Hide SVG Badges' : 'Preview SVG Badges'}</span>
-                  </Button>
-
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      const md = generateComparisonMarkdown(compareDataA, compareDataB);
-                      navigator.clipboard.writeText(md);
-                      setModalCopiedMarkdown(true);
-                      setTimeout(() => setModalCopiedMarkdown(false), 2500);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs h-8 px-3"
-                  >
-                    {modalCopiedMarkdown ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-400" />
-                        <span>Copied Markdown!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 mr-1.5" />
-                        <span>Copy Markdown Table</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {/* Side-by-Side SVG Preview in Modal */}
-                {modalShowBadges && (
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-                        <Palette className="w-3.5 h-3.5 text-blue-400" />
-                        <span>Badge Theme</span>
-                      </span>
-                      <div className="flex flex-wrap gap-1">
-                        {['default', 'github', 'radical', 'tokyonight', 'dracula', 'react'].map((th) => (
-                          <button
-                            key={th}
-                            onClick={() => setModalCompareTheme(th)}
-                            className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize transition-all ${
-                              modalCompareTheme === th
-                                ? 'bg-white text-slate-950 shadow font-bold'
-                                : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-                            }`}
-                          >
-                            {th}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="p-2 rounded-xl bg-slate-900/60 border border-blue-500/20 flex flex-col items-center">
-                        <span className="text-[10px] font-mono text-blue-400 mb-1.5">@{compareDataA.username}</span>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`${API_BASE}/users/${compareDataA.username}/streak.svg?theme=${modalCompareTheme}`}
-                          alt={`${compareDataA.username} streak`}
-                          className="rounded-xl max-w-full h-auto shadow"
-                        />
-                      </div>
-                      <div className="p-2 rounded-xl bg-slate-900/60 border border-indigo-500/20 flex flex-col items-center">
-                        <span className="text-[10px] font-mono text-indigo-400 mb-1.5">@{compareDataB.username}</span>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={`${API_BASE}/users/${compareDataB.username}/streak.svg?theme=${modalCompareTheme}`}
-                          alt={`${compareDataB.username} streak`}
-                          className="rounded-xl max-w-full h-auto shadow"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Real Contribution Streak Highlight */}
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-950 to-blue-500/10 border border-amber-500/30 space-y-4 text-center">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
-                      <Flame className="w-4 h-4 text-amber-400 animate-pulse" />
-                      <span>Authentic GitHub Streak Comparison</span>
-                    </span>
-                    <Badge className="bg-amber-500/20 text-amber-300 text-[10px] font-mono">
-                      {compareDataA.currentStreak >= compareDataB.currentStreak
-                        ? `@${compareDataA.username} +${compareDataA.currentStreak - compareDataB.currentStreak}d`
-                        : `@${compareDataB.username} +${compareDataB.currentStreak - compareDataA.currentStreak}d`}
-                    </Badge>
-                  </div>
-
-                  {/* Current Streak */}
-                  <div className="grid grid-cols-3 items-center">
-                    <div className="space-y-0.5">
-                      <p className={`text-xl sm:text-2xl font-black ${compareDataA.currentStreak >= compareDataB.currentStreak ? 'text-amber-400' : 'text-white'}`}>
-                        {formatNumber(compareDataA.currentStreak)} Days
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        {compareDataA.currentStreakStart && compareDataA.currentStreakEnd
-                          ? `${compareDataA.currentStreakStart} - ${compareDataA.currentStreakEnd}`
-                          : 'Active Streak'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                        Current Streak
-                      </span>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <p className={`text-xl sm:text-2xl font-black ${compareDataB.currentStreak >= compareDataA.currentStreak ? 'text-amber-400' : 'text-white'}`}>
-                        {formatNumber(compareDataB.currentStreak)} Days
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        {compareDataB.currentStreakStart && compareDataB.currentStreakEnd
-                          ? `${compareDataB.currentStreakStart} - ${compareDataB.currentStreakEnd}`
-                          : 'Active Streak'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Longest Streak */}
-                  <div className="grid grid-cols-3 items-center pt-3 border-t border-slate-800/80">
-                    <div className="space-y-0.5">
-                      <p className={`text-xl sm:text-2xl font-black ${compareDataA.longestStreak >= compareDataB.longestStreak ? 'text-emerald-400' : 'text-white'}`}>
-                        {formatNumber(compareDataA.longestStreak)} Days
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        {compareDataA.longestStreakStart && compareDataA.longestStreakEnd
-                          ? `${compareDataA.longestStreakStart} - ${compareDataA.longestStreakEnd}`
-                          : 'Record Streak'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                        Longest Streak
-                      </span>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <p className={`text-xl sm:text-2xl font-black ${compareDataB.longestStreak >= compareDataA.longestStreak ? 'text-emerald-400' : 'text-white'}`}>
-                        {formatNumber(compareDataB.longestStreak)} Days
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        {compareDataB.longestStreakStart && compareDataB.longestStreakEnd
-                          ? `${compareDataB.longestStreakStart} - ${compareDataB.longestStreakEnd}`
-                          : 'Record Streak'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Metrics Breakdown with Visual Ratio Bars */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between pb-1 border-b border-slate-800 text-[11px] text-slate-400">
-                    <span className="font-semibold text-blue-400">@{compareDataA.username}</span>
-                    <span className="uppercase tracking-wider font-bold">Metrics Head-to-Head</span>
-                    <span className="font-semibold text-indigo-400">@{compareDataB.username}</span>
-                  </div>
-
-                  {[
-                    {
-                      label: 'Total Contributions',
-                      valA: compareDataA.contributions,
-                      valB: compareDataB.contributions,
-                      displayA: formatNumber(compareDataA.contributions),
-                      displayB: formatNumber(compareDataB.contributions),
-                      colorA: 'bg-blue-500',
-                      colorB: 'bg-indigo-500'
-                    },
-                    {
-                      label: 'Public Contributions',
-                      valA: compareDataA.publicContribs,
-                      valB: compareDataB.publicContribs,
-                      displayA: formatNumber(compareDataA.publicContribs),
-                      displayB: formatNumber(compareDataB.publicContribs),
-                      colorA: 'bg-emerald-500',
-                      colorB: 'bg-emerald-600'
-                    },
-                    {
-                      label: 'Private Contributions',
-                      valA: compareDataA.privateContribs,
-                      valB: compareDataB.privateContribs,
-                      displayA: formatNumber(compareDataA.privateContribs),
-                      displayB: formatNumber(compareDataB.privateContribs),
-                      colorA: 'bg-purple-500',
-                      colorB: 'bg-purple-600'
-                    },
-                    {
-                      label: 'Followers',
-                      valA: compareDataA.followers,
-                      valB: compareDataB.followers,
-                      displayA: formatNumber(compareDataA.followers),
-                      displayB: formatNumber(compareDataB.followers),
-                      colorA: 'bg-blue-500',
-                      colorB: 'bg-indigo-500'
-                    },
-                    {
-                      label: 'Repositories',
-                      valA: compareDataA.repos,
-                      valB: compareDataB.repos,
-                      displayA: `${compareDataA.repos || 0}`,
-                      displayB: `${compareDataB.repos || 0}`,
-                      colorA: 'bg-purple-500',
-                      colorB: 'bg-indigo-500'
-                    },
-                    {
-                      label: 'Daily Velocity',
-                      valA: compareDataA.averagePerDay,
-                      valB: compareDataB.averagePerDay,
-                      displayA: `${compareDataA.averagePerDay || 0}/day`,
-                      displayB: `${compareDataB.averagePerDay || 0}/day`,
-                      colorA: 'bg-amber-500',
-                      colorB: 'bg-emerald-500'
-                    }
-                  ].map((item) => {
-                    const ratio = getRatio(item.valA, item.valB);
-                    const isLeadA = Number(item.valA) > Number(item.valB);
-                    const isLeadB = Number(item.valB) > Number(item.valA);
-                    return (
-                      <div key={item.label} className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5">
-                        <div className="flex justify-between items-center text-xs">
-                          <div className="flex items-center gap-1">
-                            {isLeadA && <Crown className="w-3 h-3 text-amber-400" />}
-                            <span className={`font-mono font-bold text-xs ${isLeadA ? 'text-blue-300' : 'text-slate-300'}`}>
-                              {item.displayA}
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                            {item.label}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <span className={`font-mono font-bold text-xs ${isLeadB ? 'text-indigo-300' : 'text-slate-300'}`}>
-                              {item.displayB}
-                            </span>
-                            {isLeadB && <Crown className="w-3 h-3 text-amber-400" />}
-                          </div>
-                        </div>
-
-                        {/* Proportional Duel Ratio Track */}
-                        <div className="w-full h-1.5 rounded-full bg-slate-900 border border-slate-800 flex overflow-hidden">
-                          <div
-                            style={{ width: `${ratio.pctA}%` }}
-                            className={`h-full ${item.colorA} rounded-l-full transition-all duration-500 opacity-90 hover:opacity-100`}
-                            title={`@${compareDataA.username}: ${ratio.pctA}%`}
-                          />
-                          <div
-                            style={{ width: `${ratio.pctB}%` }}
-                            className={`h-full ${item.colorB} rounded-r-full transition-all duration-500 opacity-90 hover:opacity-100`}
-                            title={`@${compareDataB.username}: ${ratio.pctB}%`}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Primary Language */}
-                  <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 flex justify-between items-center text-xs">
-                    <span className="font-bold text-blue-400">{compareDataA.lang}</span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top Language</span>
-                    <span className="font-bold text-indigo-400">{compareDataB.lang}</span>
-                  </div>
-                </div>
-
-                {/* Direct Links */}
-                <div className="flex gap-3 pt-2">
-                  <Link href={`/profile/${compareDataA.username}`} className="flex-1">
-                    <Button variant="outline" className="w-full text-xs border-slate-700 bg-slate-800 text-slate-200">
-                      Open @{compareDataA.username}
-                    </Button>
-                  </Link>
-                  <Link href={`/profile/${compareDataB.username}`} className="flex-1">
-                    <Button className="w-full text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold">
-                      Open @{compareDataB.username}
-                    </Button>
-                  </Link>
-                </div>
-              </>
-            ) : null}
-
-          </div>
-        </div>
-      )}
-
-    </div>
-  );
-}

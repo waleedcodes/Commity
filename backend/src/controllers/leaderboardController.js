@@ -139,13 +139,27 @@ class LeaderboardController {
         // Get total count for pagination
         const totalCount = await User.countDocuments(query);
 
-        // Add rank numbers
-        const rankedUsers = users.map((user, index) => ({
-          ...user,
-          rank: skip + index + 1,
-          categoryValue: user[sortField] || 0,
-          percentile: Math.round((1 - (skip + index) / totalCount) * 100),
-        }));
+        // Add rank numbers (respect authoritative committers.top rank when filtered by country/location)
+        const rankedUsers = users.map((user, index) => {
+          let officialRank = null;
+          if (location) {
+            if (category === 'commits' && user.countryRankCommits) {
+              officialRank = user.countryRankCommits;
+            } else if (category === 'public_contributions' && user.countryRankPublic) {
+              officialRank = user.countryRankPublic;
+            } else {
+              officialRank = user.countryRankAll || user.countryRank;
+            }
+          }
+          return {
+            ...user,
+            rank: officialRank || (skip + index + 1),
+            dbPosition: skip + index + 1,
+            officialRank: officialRank || null,
+            categoryValue: user[sortField] || 0,
+            percentile: Math.round((1 - (skip + index) / totalCount) * 100),
+          };
+        });
 
         // Regional ecosystem scale metadata (committers.top model)
         const REGION_ECOSYSTEM_DATA = {
@@ -242,10 +256,8 @@ class LeaderboardController {
             { $group: { _id: null, total: { $sum: '$followers' } } }
           ]),
           User.aggregate([
-            { $match: { isActive: true, location: { $exists: true, $ne: null } } },
-            { $group: { _id: '$location', count: { $sum: 1 } } },
-            { $sort: { count: -1 } },
-            { $limit: 10 }
+            { $match: { isActive: true, location: { $exists: true, $nin: [null, '', 'undefined', 'null'] } } },
+            { $group: { _id: '$location', count: { $sum: 1 } } }
           ]),
           User.aggregate([
             { $match: { isActive: true } },
@@ -289,10 +301,18 @@ class LeaderboardController {
             averageCommitsPerUser: totalUsers > 0 ? Math.round(commitsSum / totalUsers) : 0,
             averageReposPerUser: totalUsers > 0 ? Math.round(reposSum / totalUsers) : 0,
           },
-          topCountries: topCountries.map(country => ({
-            name: country._id,
-            userCount: country.count,
-          })),
+          topCountries: (() => {
+            const countryMap = new Map();
+            for (const item of (topCountries || [])) {
+              const country = Helpers.normalizeCountry(item._id);
+              if (!country) continue;
+              countryMap.set(country, (countryMap.get(country) || 0) + item.count);
+            }
+            return Array.from(countryMap.entries())
+              .map(([name, userCount]) => ({ name, userCount }))
+              .sort((a, b) => b.userCount - a.userCount)
+              .slice(0, 10);
+          })(),
           topLanguages: topLanguages.map(lang => ({
             name: lang._id,
             userCount: lang.totalUsers,

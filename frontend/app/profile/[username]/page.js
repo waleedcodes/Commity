@@ -103,7 +103,6 @@ export default function UserProfile({ params }) {
 
   const userHandle = user?.login || user?.username || username;
   const userDisplayName = user?.name || userHandle;
-  const isWaleed = userHandle?.toLowerCase() === 'waleedcodes';
 
   const languagesList = useMemo(() => {
     return (userAnalytics?.languages && userAnalytics.languages.length > 0)
@@ -171,8 +170,8 @@ export default function UserProfile({ params }) {
         if (saved) {
           const parsed = JSON.parse(saved);
           setIsActiveUser(parsed?.username?.toLowerCase() === userHandle.toLowerCase());
-        } else if (userHandle.toLowerCase() === 'waleedcodes') {
-          setIsActiveUser(true);
+        } else {
+          setIsActiveUser(false);
         }
       } catch {
         // ignore

@@ -153,7 +153,7 @@ export default function Leaderboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [expandedFaq, setExpandedFaq] = useState(0);
-  const [activeUserHandle, setActiveUserHandle] = useState('waleedcodes');
+  const [activeUserHandle, setActiveUserHandle] = useState('');
 
   useEffect(() => {
     try {
@@ -870,14 +870,14 @@ export default function Leaderboard() {
                   const username = user.username || user.login;
                   const val = getMetricValue(user, selectedCategory);
                   const isTop3 = rank <= 3;
-                  const isWaleed = username?.toLowerCase() === 'waleedcodes';
+                  const isCurrentUser = activeUserHandle && username?.toLowerCase() === activeUserHandle.toLowerCase();
 
                   return (
                     <Link
                       key={user._id || user.id || username}
                       href={`/profile/${username}`}
                       className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 transition hover:bg-slate-700/40 group ${
-                        isWaleed 
+                        isCurrentUser 
                           ? 'bg-amber-500/10 border-l-4 border-amber-500 shadow-sm'
                           : rank === 1 ? 'bg-amber-500/5' : rank === 2 ? 'bg-slate-800/40' : rank === 3 ? 'bg-amber-950/10' : ''
                       }`}
@@ -892,13 +892,13 @@ export default function Leaderboard() {
                           ) : rank === 3 ? (
                             <span className="text-2xl" title="Rank 3">🥉</span>
                           ) : (
-                            <span className={`font-mono ${isWaleed ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>#{rank}</span>
+                            <span className={`font-mono ${isCurrentUser ? 'text-amber-400 font-bold' : 'text-slate-400'}`}>#{rank}</span>
                           )}
                         </div>
 
                         {/* Avatar */}
                         <Avatar className={`h-12 w-12 shrink-0 ring-2 ${
-                          isWaleed ? 'ring-amber-400 shadow-md' : rank === 1 ? 'ring-amber-400' : rank === 2 ? 'ring-slate-300' : rank === 3 ? 'ring-amber-600' : 'ring-slate-700'
+                          isCurrentUser ? 'ring-amber-400 shadow-md' : rank === 1 ? 'ring-amber-400' : rank === 2 ? 'ring-slate-300' : rank === 3 ? 'ring-amber-600' : 'ring-slate-700'
                         }`}>
                           <AvatarImage src={user.avatarUrl || user.avatar_url} alt={username} />
                           <AvatarFallback className="bg-slate-700 text-slate-200 font-medium">
@@ -913,9 +913,9 @@ export default function Leaderboard() {
                               {user.name || username}
                             </h3>
                             <span className="text-xs text-slate-400 font-mono">@{username}</span>
-                            {isWaleed && (
+                            {isCurrentUser && (
                               <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-[10px] py-0 font-semibold">
-                                ★ Featured Maintainer
+                                ★ You
                               </Badge>
                             )}
                             {user.location && (

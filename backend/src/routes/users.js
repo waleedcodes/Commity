@@ -1,9 +1,10 @@
-// [Commity Core Phase 1: Setup] users.js
+// [Commity Core Phase 2: Logic] users.js
 const express = require('express');
 const router = express.Router();
 
 // Import controllers
 const UserController = require('../controllers/userController');
+const WrappedController = require('../controllers/wrappedController');
 
 // Import middleware
 const { 
@@ -68,6 +69,16 @@ router.get('/:username/streak',
 );
 
 /**
+ * @route   GET /api/users/:username/wrapped
+ * @desc    Get GitHub Developer Wrapped & Social Share insights
+ * @access  Public
+ */
+router.get('/:username/wrapped',
+  validateGitHubUsername,
+  WrappedController.getDeveloperWrapped
+);
+
+/**
  * @route   GET /api/users/:username
  * @desc    Get user profile by username
  * @access  Public
@@ -105,62 +116,3 @@ router.put('/:username',
  * @route   GET /api/users/:username/repositories
  * @route   GET /api/users/:username/repos (alias)
  * @desc    Get user repositories
- * @access  Public
- */
-router.get('/:username/repositories',
-  validateGitHubUsername,
-  optionalAuth,
-  UserController.getUserRepositories
-);
-
-router.get('/:username/repos',
-  validateGitHubUsername,
-  optionalAuth,
-  UserController.getUserRepositories
-);
-
-/**
- * @route   GET /api/users/:username/contributions
- * @desc    Get user contribution calendar and stats
- * @access  Public
- */
-router.get('/:username/contributions',
-  validateGitHubUsername,
-  optionalAuth,
-  UserController.getUserContributions
-);
-
-/**
- * @route   GET /api/users/:username/activity
- * @desc    Get user activity/events
- * @access  Public
- */
-router.get('/:username/activity',
-  validateGitHubUsername,
-  optionalAuth,
-  UserController.getUserActivity
-);
-
-/**
- * @route   GET /api/users/:username/stats
- * @desc    Get user statistics summary
- * @access  Public
- */
-router.get('/:username/stats',
-  validateGitHubUsername,
-  optionalAuth,
-  UserController.getUserStats
-);
-
-/**
- * @route   POST /api/users/:username/refresh
- * @desc    Refresh user data from GitHub
- * @access  Public (with rate limiting)
- */
-router.post('/:username/refresh',
-  validateGitHubUsername,
-  optionalAuth,
-  UserController.refreshUserData
-);
-
-module.exports = router;

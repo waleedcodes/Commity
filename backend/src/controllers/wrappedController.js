@@ -178,3 +178,93 @@ class WrappedController {
         } else if (totalContributions >= 2000 || commits >= 400) {
           archetype = {
             title: 'Full-Stack Velocity Demon',
+            badge: '⚡ Velocity Demon',
+            tagline: 'High-frequency builder turning ideas into production at supersonic speed',
+            theme: 'from-amber-400 via-rose-500 to-purple-700',
+            accentColor: '#ec4899',
+            quote: 'Speed and precision can co-exist.',
+            description: 'A force of nature in git commits. You break through blockers with relentless execution speed.'
+          };
+        }
+
+        // Custom Highlights
+        const highlights = [
+          {
+            label: 'Total Contributions',
+            value: totalContributions.toLocaleString(),
+            subtext: `${publicContributions.toLocaleString()} Public • ${privateContributions.toLocaleString()} Private`,
+            icon: 'Activity'
+          },
+          {
+            label: 'Max Coding Streak',
+            value: `${longestStreak} Days`,
+            subtext: currentStreak > 0 ? `Active streak: ${currentStreak} days` : 'Recorded peak continuous streak',
+            icon: 'Flame'
+          },
+          {
+            label: 'Dominant Tech DNA',
+            value: `${primaryLanguage} (${primaryPercentage}%)`,
+            subtext: `${topLanguages.length} active technologies tracked`,
+            icon: 'Code'
+          },
+          {
+            label: countryRank ? `National Rank (#${countryRank})` : 'Global Ecosystem',
+            value: countryRank ? `#${countryRank} in ${country}` : globalPercentile,
+            subtext: nationalPercentile ? `${nationalPercentile} verified maintainers` : 'GitHub developer community',
+            icon: 'Trophy'
+          }
+        ];
+
+        return {
+          year,
+          generatedAt: new Date().toISOString(),
+          user: {
+            username: user.username,
+            name: user.name || user.username,
+            avatarUrl: user.avatarUrl,
+            bio: user.bio,
+            location: user.location,
+            country,
+            followers: user.followers,
+            publicRepos: user.publicRepos,
+          },
+          metrics: {
+            totalContributions,
+            publicContributions,
+            privateContributions,
+            commits,
+            pullRequests,
+            codeReviews,
+            issues,
+            longestStreak,
+            currentStreak,
+            followers,
+            publicRepos,
+            topLanguages,
+            primaryLanguage,
+            primaryPercentage
+          },
+          standings: {
+            country,
+            countryRank,
+            countryRankPublic,
+            countryRankCommits,
+            nationalPercentile,
+            globalPercentile
+          },
+          archetype,
+          highlights
+        };
+      },
+      10 * 60 // 10 minutes cache
+    );
+
+    res.json({
+      success: true,
+      data: wrappedData,
+      timestamp: new Date().toISOString()
+    });
+  });
+}
+
+module.exports = WrappedController;

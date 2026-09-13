@@ -1,4 +1,4 @@
-// [Commity Core Phase 1: Setup] Navigation.js
+// [Commity Core Phase 2: Logic] Navigation.js
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -100,6 +100,7 @@ export default function Navigation() {
     { name: 'Profiles', href: '/profile', icon: Users },
     { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Wrapped', href: '/wrapped', icon: Sparkles, badge: '🎁 2026' },
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   ];
 
@@ -151,6 +152,11 @@ export default function Navigation() {
                 >
                   <Icon className={cn('w-4 h-4', isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-400')} />
                   <span>{item.name}</span>
+                  {item.badge && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 shadow-xs">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -202,108 +208,3 @@ export default function Navigation() {
 
             {/* User Profile Avatar */}
             <Link href={`/profile/${currentUser.username}`}>
-              <Button variant="ghost" size="sm" className="h-9 px-2.5 rounded-lg flex items-center space-x-2 border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800">
-                <Avatar className="h-6 w-6">
-                  <AvatarImage src={currentUser.avatar} alt={currentUser.username} />
-                  <AvatarFallback className="text-xs font-semibold">
-                    {currentUser.username ? currentUser.username[0]?.toUpperCase() : 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden sm:inline text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  {currentUser.username}
-                </span>
-              </Button>
-            </Link>
-
-            {/* Mobile menu button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="md:hidden w-9 h-9 p-0"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {isMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </Button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation Drawer */}
-        {isMenuOpen && (
-          <div className="md:hidden py-4 border-t border-slate-200 dark:border-slate-800 space-y-3 animate-in slide-in-from-top-2">
-            {/* Mobile Search & Spotlight */}
-            <div className="px-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  setIsPaletteOpen(true);
-                }}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-sm border border-slate-200 dark:border-slate-700"
-              >
-                <div className="flex items-center space-x-2">
-                  <Search className="w-4 h-4 text-slate-400" />
-                  <span>Search developers or pages...</span>
-                </div>
-                <kbd className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                  ⌘K
-                </kbd>
-              </button>
-            </div>
-
-            {/* Mobile Menu Items */}
-            <div className="space-y-1">
-              {navigation.map((item) => {
-                const Icon = item.icon;
-                const isActive = pathname === item.href;
-                return (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={cn(
-                      'flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-semibold'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                    )}
-                    onClick={() => setIsMenuOpen(false)}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span>{item.name}</span>
-                  </Link>
-                );
-              })}
-
-              {/* Mobile Active User Link */}
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 mt-2">
-                <Link
-                  href={`/profile/${currentUser.username}`}
-                  className="flex items-center space-x-3 px-3 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  <Avatar className="h-6 w-6">
-                    <AvatarImage src={currentUser.avatar} alt={currentUser.username} />
-                    <AvatarFallback className="text-xs font-semibold">
-                      {currentUser.username ? currentUser.username[0]?.toUpperCase() : 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="font-semibold text-xs leading-tight">My Profile</span>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">@{currentUser.username}</span>
-                  </div>
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Global Spotlight Command Palette */}
-      <CommandPalette 
-        isOpen={isPaletteOpen} 
-        onClose={(forceOpen) => setIsPaletteOpen(forceOpen === true)} 
-        onToggleDarkMode={toggleDarkMode} 
-      />
-    </nav>
-  );
-}

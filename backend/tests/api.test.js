@@ -248,6 +248,19 @@ describe('API Routes', () => {
       expect(response.body.data).toHaveProperty('longestStreak');
     });
 
+    test('GET /api/users/:username/wrapped should return wrapped insights', async () => {
+      const response = await request(app)
+        .get('/api/users/octocat/wrapped')
+        .expect(200);
+
+      expect(response.body).toHaveProperty('success', true);
+      expect(response.body.data).toHaveProperty('year');
+      expect(response.body.data).toHaveProperty('metrics');
+      expect(response.body.data).toHaveProperty('archetype');
+      expect(response.body.data.archetype).toHaveProperty('title');
+      expect(response.body.data.archetype).toHaveProperty('badge');
+    });
+
     test('GET /api/users/:username/badge.svg should return SVG badge', async () => {
       const response = await request(app)
         .get('/api/users/octocat/badge.svg')

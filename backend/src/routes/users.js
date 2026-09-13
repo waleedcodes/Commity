@@ -3,6 +3,7 @@ const router = express.Router();
 
 // Import controllers
 const UserController = require('../controllers/userController');
+const WrappedController = require('../controllers/wrappedController');
 
 // Import middleware
 const { 
@@ -64,6 +65,16 @@ router.get('/:username/streak.svg',
 router.get('/:username/streak',
   validateGitHubUsername,
   UserController.getUserStreakStats
+);
+
+/**
+ * @route   GET /api/users/:username/wrapped
+ * @desc    Get GitHub Developer Wrapped & Social Share insights
+ * @access  Public
+ */
+router.get('/:username/wrapped',
+  validateGitHubUsername,
+  WrappedController.getDeveloperWrapped
 );
 
 /**

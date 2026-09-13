@@ -764,6 +764,12 @@ export default function ProfileHub() {
 
             {/* Quick Actions Header */}
             <div className="flex items-center gap-2.5">
+              <Link href="/wrapped">
+                <Button className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-purple-500/20 h-10 px-3.5">
+                  <Sparkles className="w-3.5 h-3.5 mr-1.5 text-amber-300" />
+                  <span>2026 Wrapped 🎁</span>
+                </Button>
+              </Link>
               {featuredProfile?.username && (
                 <Link href={`/profile/${featuredProfile.username}`}>
                   <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-500/20 h-10 px-4">

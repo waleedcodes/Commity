@@ -790,6 +790,17 @@ Verified on Commity (committers.top architecture): ${appBase}/profile/${myHandle
 
             {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+              <Link href={`/wrapped?user=${encodeURIComponent(userHandle)}`}>
+                <Button 
+                  size="sm"
+                  className="flex-1 sm:flex-initial bg-gradient-to-r from-purple-600 via-indigo-600 to-amber-500 hover:from-purple-500 hover:to-amber-400 text-white font-bold text-xs shadow-md shadow-purple-600/20 gap-1.5 h-9"
+                  title="View 2026 Developer Wrapped"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+                  <span>2026 Wrapped 🎁</span>
+                </Button>
+              </Link>
+
               <Button 
                 onClick={handleSyncWithGitHub}
                 disabled={isSyncing}

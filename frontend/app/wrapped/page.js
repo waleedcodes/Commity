@@ -559,3 +559,284 @@ function WrappedContent() {
                     <h2 className="text-4xl sm:text-6xl font-black text-white font-mono">
                       {data.metrics.longestStreak} Days
                     </h2>
+                    <p className="text-xs sm:text-sm text-slate-300">Longest Continuous Coding Streak</p>
+                  </div>
+
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto leading-relaxed">
+                    {data.metrics.longestStreak >= 30 
+                      ? "A remarkable demonstration of discipline. Your contribution graph stayed lit for months without skipping a beat."
+                      : "Consistent and deliberate. You balance deep focused sprints with production releases."}
+                  </p>
+
+                  <div className="flex items-center justify-center gap-4 pt-2">
+                    <div className="px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                      <p className="text-[10px] text-slate-400">Current Streak</p>
+                      <p className="text-base font-bold text-amber-300 font-mono">{data.metrics.currentStreak} Days</p>
+                    </div>
+                    <div className="px-4 py-2 rounded-xl bg-slate-900/80 border border-slate-800 text-center">
+                      <p className="text-[10px] text-slate-400">Public Repos</p>
+                      <p className="text-base font-bold text-indigo-300 font-mono">{data.metrics.publicRepos}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDE 3: Tech DNA & Language Craft */}
+              {activeSlide === 3 && (
+                <div className="my-auto space-y-6 text-center animate-in fade-in zoom-in-95 duration-500">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">Language Ecosystem</span>
+                    <h2 className="text-3xl sm:text-4xl font-black text-white">
+                      Your Tech DNA
+                    </h2>
+                  </div>
+
+                  {/* Primary Language Card */}
+                  <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 max-w-md mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-left">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <Code className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 font-medium">Primary Craft</p>
+                        <p className="text-lg font-bold text-white">{data.metrics.primaryLanguage}</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-xs font-mono font-bold">
+                      {data.metrics.primaryPercentage}% Dominance
+                    </Badge>
+                  </div>
+
+                  {/* Multi-language Spectrum Bars */}
+                  <div className="space-y-2 max-w-md mx-auto">
+                    {data.metrics.topLanguages.slice(0, 4).map((lang) => (
+                      <div key={lang.name} className="space-y-1">
+                        <div className="flex justify-between text-xs text-slate-300">
+                          <span className="font-semibold">{lang.name}</span>
+                          <span className="font-mono text-slate-400">{Math.round(lang.percentage)}%</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all"
+                            style={{ 
+                              width: `${Math.max(4, lang.percentage)}%`,
+                              backgroundColor: lang.color || '#6366f1'
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDE 4: Developer Archetype Reveal */}
+              {activeSlide === 4 && (
+                <div className="my-auto space-y-6 text-center animate-in fade-in zoom-in-95 duration-500">
+                  <span className="text-xs font-bold uppercase tracking-widest text-purple-400">
+                    Developer Archetype
+                  </span>
+
+                  <div className="relative max-w-md mx-auto">
+                    {/* Glowing Aura */}
+                    <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 opacity-30 blur-xl animate-pulse" />
+                    
+                    <div className="relative p-6 sm:p-8 rounded-3xl bg-slate-900/90 border border-purple-500/40 space-y-4">
+                      <div className="inline-block text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+                        {data.archetype.badge}
+                      </div>
+
+                      <p className="text-xs sm:text-sm font-semibold text-purple-300">
+                        &ldquo;{data.archetype.tagline}&rdquo;
+                      </p>
+
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        {data.archetype.description}
+                      </p>
+
+                      <div className="pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 italic font-serif">
+                        &ldquo;{data.archetype.quote}&rdquo;
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SLIDE 5: Grand Finale & Social Share Card */}
+              {activeSlide === 5 && (
+                <div className="my-auto space-y-4 text-center animate-in fade-in zoom-in-95 duration-500">
+                  <div className="space-y-1">
+                    <span className="text-xs font-bold uppercase tracking-widest text-amber-400">
+                      ★ 2026 Developer Summary ★
+                    </span>
+                    <h2 className="text-2xl sm:text-3xl font-black text-white">
+                      Ready to Share Your Impact?
+                    </h2>
+                  </div>
+
+                  {/* High-Aesthetic Mini Card Preview */}
+                  <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-950 border border-indigo-500/40 shadow-xl space-y-3 max-w-md mx-auto text-left">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar className="w-9 h-9 ring-2 ring-indigo-400">
+                          <AvatarImage src={data.user.avatarUrl} alt={data.user.username} />
+                          <AvatarFallback>{data.user.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-xs font-bold text-white leading-none">{data.user.name}</p>
+                          <p className="text-[11px] text-indigo-400 font-mono">@{data.user.username}</p>
+                        </div>
+                      </div>
+                      <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px]">
+                        2026 Wrapped
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1 font-mono">
+                      <div className="p-2 rounded-lg bg-slate-800/50">
+                        <p className="text-[9px] text-slate-400 uppercase">Contributions</p>
+                        <p className="text-sm font-bold text-sky-400">{data.metrics.totalContributions.toLocaleString()}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-800/50">
+                        <p className="text-[9px] text-slate-400 uppercase">Streak Peak</p>
+                        <p className="text-sm font-bold text-amber-400">{data.metrics.longestStreak} Days</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-800/50">
+                        <p className="text-[9px] text-slate-400 uppercase">Tech DNA</p>
+                        <p className="text-sm font-bold text-emerald-400">{data.metrics.primaryLanguage}</p>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-800/50">
+                        <p className="text-[9px] text-slate-400 uppercase">Archetype</p>
+                        <p className="text-xs font-bold text-purple-400 truncate">{data.archetype.badge}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2 max-w-md mx-auto">
+                    <Button
+                      onClick={handleDownloadCard}
+                      disabled={exporting}
+                      className="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs h-10 shadow-lg shadow-amber-500/20 gap-1.5"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>{exporting ? 'Generating PNG...' : 'Download PNG Card'}</span>
+                    </Button>
+
+                    <a
+                      href={twitterUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto"
+                    >
+                      <Button
+                        variant="outline"
+                        className="w-full border-slate-700 hover:border-sky-500 hover:bg-sky-500/10 text-white text-xs h-10 gap-1.5"
+                      >
+                        <Twitter className="w-4 h-4 text-sky-400 fill-sky-400" />
+                        <span>Post on X</span>
+                      </Button>
+                    </a>
+
+                    <a
+                      href={linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:w-auto"
+                    >
+                      <Button
+                        variant="outline"
+                        className="w-full border-slate-700 hover:border-blue-500 hover:bg-blue-500/10 text-white text-xs h-10 gap-1.5"
+                      >
+                        <Linkedin className="w-4 h-4 text-blue-400" />
+                        <span>Share</span>
+                      </Button>
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Bottom Navigation Controls within Slide */}
+              <div className="flex items-center justify-between pt-4 border-t border-slate-800/60 z-10">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={prevSlide}
+                  disabled={activeSlide === 0}
+                  className="text-xs text-slate-400 hover:text-white disabled:opacity-30 gap-1"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Previous</span>
+                </Button>
+
+                {activeSlide < TOTAL_SLIDES - 1 ? (
+                  <Button
+                    size="sm"
+                    onClick={nextSlide}
+                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 gap-1"
+                  >
+                    <span>Next</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    onClick={() => { setActiveSlide(0); setProgress(0); }}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs gap-1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Replay</span>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Quick Share Links Bar */}
+            <div className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-800/80 text-xs text-slate-400">
+              <div className="flex items-center gap-2 truncate">
+                <Share2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <span className="truncate">Share your custom link with friends and team</span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCopyLink}
+                className="h-7 px-2.5 text-xs text-slate-300 hover:text-white gap-1 shrink-0"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? 'Copied!' : 'Copy Link'}</span>
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-800/60 py-6 px-4 text-center text-xs text-slate-500">
+        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
+          <p>Commity GitHub Analytics • Verified 365-day developer metrics</p>
+          <div className="flex items-center gap-4">
+            <Link href={`/profile/${username}`} className="hover:text-slate-300 transition">
+              Full Profile ↗
+            </Link>
+            <Link href="/leaderboard" className="hover:text-slate-300 transition">
+              Leaderboard ↗
+            </Link>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+export default function WrappedPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
+        <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
+      </div>
+    }>
+      <WrappedContent />
+    </Suspense>
+  );
+}

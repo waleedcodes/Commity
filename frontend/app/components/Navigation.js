@@ -99,6 +99,7 @@ export default function Navigation() {
     { name: 'Profiles', href: '/profile', icon: Users },
     { name: 'Leaderboard', href: '/leaderboard', icon: Trophy },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+    { name: 'Wrapped', href: '/wrapped', icon: Sparkles, badge: '🎁 2026' },
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   ];
 
@@ -150,6 +151,11 @@ export default function Navigation() {
                 >
                   <Icon className={cn('w-4 h-4', isActive ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-400')} />
                   <span>{item.name}</span>
+                  {item.badge && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-gradient-to-r from-amber-500 to-rose-500 text-slate-950 shadow-xs">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

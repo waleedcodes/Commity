@@ -219,5 +219,113 @@ npm run build
 ```
 *Runs Turbopack compile, ESLint checks, and static page generation across all 10 application routes.*
 
+---
 
-<!-- Work in Progress: Final sections in incoming commit -->
+## 📚 API Reference
+
+Base URL: `http://localhost:5001/api`
+
+### 👤 Users API
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/users` | List indexed developers with pagination, search, and filters |
+| `GET` | `/users/search?q=:query` | Search developers by username or name |
+| `GET` | `/users/:username` | Get verified user profile (auto-syncs with GitHub GraphQL if stale) |
+| `GET` | `/users/:username/wrapped` | **Get 2026 Developer Wrapped metrics, archetype persona, and stats** |
+| `GET` | `/users/:username/streak` | Get continuous and longest streak statistics |
+| `GET` | `/users/:username/badge.svg` | Dynamic SVG rank badge for GitHub READMEs |
+| `GET` | `/users/:username/streak.svg` | Dynamic SVG streak card for GitHub READMEs |
+| `POST` | `/users/:username/sync` | Force on-demand refresh from GitHub GraphQL |
+| `GET` | `/users/:username/repositories` | List repositories with stargazers and forks |
+
+### 🏆 Leaderboard API
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/leaderboard` | Get ranked developers (`category=contributions\|commits\|followers\|repos`, `location=Pakistan`) |
+| `GET` | `/leaderboard/stats` | Macro ecosystem statistics (total contributions, normalized top countries, top languages) |
+| `GET` | `/leaderboard/featured` | Algorithmic spotlight (Worldwide, Pakistan, JavaScript, TypeScript, Python leaders) |
+| `GET` | `/leaderboard/regions` | Dynamic regional quotas, follower requirements, and developer populations |
+| `GET` | `/leaderboard/snapshots` | Historical 7-day regional snapshots |
+| `POST` | `/leaderboard/sync/regions` | Trigger on-demand sync with official committers.top rankings |
+
+### 📊 Analytics API
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/analytics` | Platform-wide contribution statistics and trends |
+| `GET` | `/analytics/summary` | Global metric overview (commits, PRs, reviews, languages) |
+| `POST` | `/analytics/compare` | Compare 2 or more developers side-by-side (`{ users: ['user1', 'user2'] }`) |
+
+---
+
+## ⚙️ Architecture & Ranking Engine
+
+```
+                               ┌─────────────────────────┐
+                               │   GitHub GraphQL API    │
+                               │ (365d contributions)    │
+                               └────────────┬────────────┘
+                                            │
+                                            ▼
+┌─────────────────────────┐    ┌─────────────────────────┐    ┌─────────────────────────┐
+│     committers.top      ├───►│      Commity Core       │◄───┤    Developer Wrapped    │
+│  Official Rank Ingestion │    │  Snapshot & Sync Engine │    │    Archetype Engine     │
+└─────────────────────────┘    └────────────┬────────────┘    └─────────────────────────┘
+                                            │
+                                            ▼
+                               ┌─────────────────────────┐
+                               │  MongoDB Atlas Storage  │
+                               │   (0ms Cached Query)    │
+                               └────────────┬────────────┘
+                                            │
+                     ┌──────────────────────┴──────────────────────┐
+                     ▼                                             ▼
+       ┌───────────────────────────┐                 ┌───────────────────────────┐
+       │   Express API (Port 5001) │                 │  Next.js 15 UI (Port 3000)│
+       │  SVG Badges & JSON Routes │                 │ Turbopack + Tailwind CSS  │
+       └───────────────────────────┘                 └───────────────────────────┘
+```
+
+1. **GitHub GraphQL Collection**: Instead of counting only default-branch public commits (like standard profile headers), Commity queries GitHub's `contributionsCollection` to capture:
+   - Public commits + Private contributions
+   - Pull requests created & merged
+   - Code reviews conducted
+   - Issues opened & resolved
+2. **committers.top Sync Cadence**: Synchronizes with committers.top weekly rankings every Monday at 02:00 AM UTC. Ranks are preserved as authoritative fields (`countryRankAll`, `countryRankCommits`, `countryRankPublic`).
+3. **Zero-Latency In-Memory Caching**: Redis-compatible in-memory caching layers ensure instant sub-millisecond responses for high-traffic endpoints.
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! To contribute:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+Please make sure all tests pass before submitting a PR:
+```bash
+cd backend && npm test
+cd ../frontend && npm run build
+```
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
+
+---
+
+<div align="center">
+
+Made with ❤️ by [WaleedCodes](https://github.com/waleedcodes) and open source contributors.
+
+**⭐ Star Commity on GitHub if you find it useful!**
+
+</div>

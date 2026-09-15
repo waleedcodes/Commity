@@ -108,6 +108,116 @@ Commity/
 │   │   └── index.js                # Express app entry point
 │   ├── tests/                      # Jest API test suite (19 test cases)
 │   ├── package.json
+│   └── .env.example
+│
+├── frontend/                       # Next.js 15 (Turbopack + App Router)
+│   ├── app/
+│   │   ├── analytics/              # Multi-user comparison & analytics hub
+│   │   ├── components/             # Reusable UI & specialized modules
+│   │   │   ├── ui/                 # Avatar, Badge, Button, Card, Input, Loading
+│   │   │   ├── CommandPalette.js   # ⌘K Global search palette
+│   │   │   ├── Navigation.js       # Responsive navbar with Wrapped 🎁 badge
+│   │   │   └── StreakStudio.js     # Streak tracking component
+│   │   ├── dashboard/              # Developer dashboard
+│   │   ├── leaderboard/            # Global & country rankings table with CSV/JSON export
+│   │   ├── profile/                # Profiles directory & city maintainer hubs
+│   │   │   └── [username]/         # Full user profile with verified GraphQL metrics
+│   │   ├── wrapped/                # 2026 Developer Wrapped stories & Canvas PNG export
+│   │   ├── layout.js               # Root layout & theme provider
+│   │   ├── page.js                 # Home landing page with Duel arena & badge studio
+│   │   └── globals.css             # Tailwind CSS & custom design tokens
+│   ├── package.json
+│   └── next.config.mjs
+│
+├── docker-compose.yml              # Multi-container orchestration
+├── LICENSE                         # MIT License
+└── README.md                       # Documentation
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- **Node.js** v18.0.0 or higher
+- **MongoDB** (Local instance or [MongoDB Atlas](https://www.mongodb.com/atlas))
+- **GitHub Personal Access Token** ([Generate here](https://github.com/settings/tokens) with `read:user` and `repo` scopes)
+
+---
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/waleedcodes/Commity.git
+cd Commity
+```
+
+---
+
+### 2. Backend Setup
+
+```bash
+cd backend
+
+# Install dependencies
+npm install
+
+# Configure environment variables
+cp .env.example .env
+```
+
+Edit `backend/.env` with your credentials:
+```env
+PORT=5001
+NODE_ENV=development
+MONGODB_URI=mongodb://localhost:27017/commity
+GITHUB_TOKEN=ghp_your_personal_access_token_here
+FRONTEND_URL=http://localhost:3000
+ENABLE_SCHEDULED_UPDATES=true
+UPDATE_SCHEDULE=0 2 * * *
+```
+
+Start the backend server:
+```bash
+npm run dev
+```
+*Backend API will run at `http://localhost:5001/api` (Health check: `http://localhost:5001/health`)*
+
+---
+
+### 3. Frontend Setup
+
+In a new terminal window:
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Set environment variable (optional, defaults to http://localhost:5001/api)
+echo "NEXT_PUBLIC_API_URL=http://localhost:5001/api" > .env.local
+
+# Start Next.js with Turbopack
+npm run dev
+```
+*Frontend application will open at `http://localhost:3000`*
+
+---
+
+## 🧪 Testing & Verification
+
+### Run Backend API Test Suite
+```bash
+cd backend
+npm test
+```
+*Executes all 19 Jest integration and unit tests covering health checks, user profiles, streak metrics, 2026 Wrapped insights, leaderboards, algorithmic featured maintainers, and comparisons.*
+
+### Validate Frontend Production Build
+```bash
+cd frontend
+npm run build
+```
+*Runs Turbopack compile, ESLint checks, and static page generation across all 10 application routes.*
 
 
-<!-- Work in Progress: Next sections in incoming commits -->
+<!-- Work in Progress: Final sections in incoming commit -->

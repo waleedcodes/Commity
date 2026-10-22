@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] syncWorker.js
 const cron = require('node-cron');
 const User = require('../models/User');
 const UserService = require('./userService');

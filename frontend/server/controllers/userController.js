@@ -314,3 +314,319 @@ class UserController {
     const { username } = req.params;
     const { 
       type = 'owner', 
+      sort = 'updated', 
+      direction = 'desc',
+      per_page = 30,
+      page = 1 
+    } = req.query;
+
+    const githubService = new GitHubService();
+    
+    try {
+      const repositories = await githubService.getUserRepositories(username, {
+        type,
+        sort,
+        direction,
+        per_page: parseInt(per_page),
+        page: parseInt(page),
+      });
+
+      // Add additional computed fields
+      const enrichedRepos = repositories.map(repo => ({
+        ...repo,
+        contributionScore: Helpers.calculateContributionScore({
+          commits: 1, // Placeholder - would need to fetch actual commit count
+          stars: repo.stargazersCount,
+          forks: repo.forksCount,
+        }),
+        isPopular: repo.stargazersCount > 10,
+        isActive: repo.pushedAt && new Date(repo.pushedAt) > new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      }));
+
+      res.json({
+        success: true,
+        data: enrichedRepos,
+        repositories: enrichedRepos,
+        totalCount: enrichedRepos.length,
+        pagination: Helpers.generatePaginationMeta(parseInt(page, 10) || 1, parseInt(per_page, 10) || 30, enrichedRepos.length),
+        filters: { type, sort, direction },
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw ErrorFactory.notFound(`User '${username}' not found on GitHub`);
+      }
+      throw error;
+    }
+  });
+
+  /**
+   * @desc    Get user activity/events
+   * @route   GET /api/users/:username/activity
+   * @access  Public
+   */
+  static getUserActivity = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const { per_page = 30, page = 1 } = req.query;
+
+    const githubService = new GitHubService();
+    
+    try {
+      const events = await githubService.getUserEvents(username, {
+        per_page: parseInt(per_page),
+        page: parseInt(page),
+      });
+
+      // Process and categorize events
+      const categorizedEvents = {
+        commits: events.filter(e => e.type === 'PushEvent'),
+        pullRequests: events.filter(e => e.type === 'PullRequestEvent'),
+        issues: events.filter(e => e.type === 'IssuesEvent'),
+        releases: events.filter(e => e.type === 'ReleaseEvent'),
+        other: events.filter(e => !['PushEvent', 'PullRequestEvent', 'IssuesEvent', 'ReleaseEvent'].includes(e.type)),
+      };
+
+      const summary = {
+        totalEvents: events.length,
+        commitEvents: categorizedEvents.commits.length,
+        prEvents: categorizedEvents.pullRequests.length,
+        issueEvents: categorizedEvents.issues.length,
+        releaseEvents: categorizedEvents.releases.length,
+        otherEvents: categorizedEvents.other.length,
+        mostActiveDay: null,
+        averageEventsPerDay: null,
+      };
+
+      res.json({
+        success: true,
+        data: events,
+        events,
+        categorized: categorizedEvents,
+        summary,
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw ErrorFactory.notFound(`User '${username}' not found on GitHub`);
+      }
+      throw error;
+    }
+  });
+
+  /**
+   * @desc    Get user contributions (calendar, streaks, totals)
+   * @route   GET /api/users/:username/contributions
+   * @access  Public
+   */
+  static getUserContributions = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    let user = await User.findByUsername(username);
+    if (!user) {
+      const githubService = new GitHubService();
+      const profile = await githubService.getUserProfile(username);
+      const contributions = await githubService.getUserContributions(username).catch(() => null);
+      const userService = new UserService();
+      user = await userService.createOrUpdateUser({
+        ...profile,
+        ...(contributions || {}),
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        totalContributions: user.totalContributions,
+        totalCommits: user.totalCommits,
+        totalPullRequests: user.totalPullRequests,
+        totalIssues: user.totalIssues,
+        totalReviews: user.totalReviews,
+        streak: {
+          current: user.contributionStreak,
+          longest: user.longestStreak,
+        },
+        contributionCalendar: user.contributionCalendar || [],
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Refresh user data from GitHub
+   * @route   POST /api/users/:username/refresh
+   * @access  Public (with rate limiting)
+   */
+  static refreshUserData = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const { includeContributions = 'true', includeLanguages = 'true' } = req.body;
+
+    const githubService = new GitHubService();
+    const userService = new UserService();
+
+    try {
+      // Fetch fresh data from GitHub
+      const [profile, contributions, languages] = await Promise.all([
+        githubService.getUserProfile(username),
+        includeContributions === 'true' ? githubService.getUserContributions(username) : null,
+        includeLanguages === 'true' ? githubService.getUserLanguages(username) : null,
+      ]);
+
+      // Update user in database
+      const updatedUser = await userService.createOrUpdateUser({
+        ...profile,
+        ...(contributions && {
+          totalCommits: contributions.totalCommits,
+          totalPullRequests: contributions.totalPullRequests,
+          totalIssues: contributions.totalIssues,
+          totalReviews: contributions.totalReviews,
+          contributionCalendar: contributions.contributionCalendar,
+        }),
+        ...(languages && { topLanguages: languages.slice(0, 10) }),
+      });
+
+      // Update user's rank
+      await updatedUser.updateRank('totalCommits');
+
+      logger.logUserActivity(req.user?.id, 'refresh_user_data', { 
+        refreshedUser: username,
+        includeContributions,
+        includeLanguages 
+      });
+
+      res.json({
+        success: true,
+        data: updatedUser.toPublicJSON(),
+        message: 'User data refreshed successfully',
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      if (error.statusCode === 404) {
+        throw ErrorFactory.notFound(`User '${username}' not found on GitHub`);
+      }
+      throw error;
+    }
+  });
+
+  /**
+   * @desc    Search users
+   * @route   GET /api/users/search
+   * @access  Public
+   */
+  static searchUsers = asyncHandler(async (req, res) => {
+    const { q, sort = 'followers', order = 'desc', per_page = 30, page = 1 } = req.query;
+
+    if (!q || q.trim().length < 2) {
+      throw ErrorFactory.badRequest('Search query must be at least 2 characters long');
+    }
+
+    const githubService = new GitHubService();
+    
+    try {
+      const searchResults = await githubService.searchUsers(q, {
+        sort,
+        order,
+        per_page: parseInt(per_page),
+        page: parseInt(page),
+      });
+
+      // Check which users exist in our database
+      const usernames = searchResults.users.map(u => u.username);
+      const existingUsers = await User.find({ 
+        username: { $in: usernames } 
+      }).select('username totalCommits followers globalRank');
+
+      // Merge GitHub search results with our database data
+      const enrichedResults = searchResults.users.map(githubUser => {
+        const dbUser = existingUsers.find(u => u.username === githubUser.username);
+        return {
+          ...githubUser,
+          inDatabase: !!dbUser,
+          ...(dbUser && {
+            totalCommits: dbUser.totalCommits,
+            followers: dbUser.followers,
+            globalRank: dbUser.globalRank,
+          }),
+        };
+      });
+
+      res.json({
+        success: true,
+        data: {
+          users: enrichedResults,
+          totalCount: searchResults.totalCount,
+          incompleteResults: searchResults.incompleteResults,
+          query: q,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
+    } catch (error) {
+      throw ErrorFactory.githubAPI(`Search failed: ${error.message}`);
+    }
+  });
+
+  /**
+   * @desc    Get user statistics summary
+   * @route   GET /api/users/:username/stats
+   * @access  Public
+   */
+  static getUserStats = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+
+    const user = await User.findByUsername(username);
+    if (!user) {
+      throw ErrorFactory.notFound(`User '${username}' not found`);
+    }
+
+    // Calculate additional statistics
+    const stats = {
+      profile: {
+        accountAge: user.accountAge,
+        profileCompletion: user.profileCompletion,
+        totalContributions: user.totalContributions,
+        contributionStreak: user.contributionStreak,
+        longestStreak: user.longestStreak,
+      },
+      rankings: {
+        global: user.globalRank,
+        byCommits: await user.updateRank('totalCommits'),
+        byFollowers: await user.updateRank('followers'),
+        byRepos: await user.updateRank('publicRepos'),
+      },
+      growth: {
+        // These would be calculated from historical data
+        followersGrowth: 0,
+        reposGrowth: 0,
+        commitsGrowth: 0,
+      },
+      activity: {
+        averageCommitsPerDay: user.totalCommits / (user.accountAge || 1),
+        topLanguages: user.topLanguages.slice(0, 5),
+        recentRepos: user.recentRepos.slice(0, 5),
+      },
+    };
+
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Force sync user profile with live GitHub data
+   * @route   POST /api/users/:username/sync
+   * @access  Public
+   */
+  static syncUserProfile = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const userService = new UserService();
+    const user = await userService.syncUserProfile(username, true);
+    res.json({
+      success: true,
+      message: `User @${username} synced with GitHub successfully`,
+      data: user.toPublicJSON(),
+      timestamp: new Date().toISOString(),

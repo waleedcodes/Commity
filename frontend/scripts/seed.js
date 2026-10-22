@@ -295,3 +295,152 @@ function generateContributionCalendar(totalContributions) {
     d.setDate(today.getDate() - i);
     d.setHours(0, 0, 0, 0);
 
+    // Random variance around average
+    const variance = Math.floor((Math.random() - 0.3) * (dailyAverage * 2));
+    const count = Math.max(0, dailyAverage + variance);
+    let level = 0;
+    if (count > 0 && count <= 3) level = 1;
+    else if (count <= 7) level = 2;
+    else if (count <= 14) level = 3;
+    else if (count > 14) level = 4;
+
+    calendar.push({
+      date: d,
+      count,
+      level
+    });
+  }
+  return calendar;
+}
+
+async function seedDatabase() {
+  console.log('🌱 Starting Commity Database Seeder...');
+  await connectDB();
+
+  let createdCount = 0;
+  let updatedCount = 0;
+
+  for (const seedData of SEED_USERS) {
+    try {
+      console.log(`\n🔍 Processing: ${seedData.username}...`);
+
+      let liveData = null;
+      try {
+        // Attempt to fetch fresh GitHub data if available
+        const ghProfile = await githubService.getUserProfile(seedData.username);
+        if (ghProfile && ghProfile.id) {
+          console.log(`  ✓ Live GitHub data fetched for ${seedData.username}`);
+          liveData = ghProfile;
+        }
+      } catch (err) {
+        console.log(`  ℹ Using rich seed template for ${seedData.username} (${err.message})`);
+      }
+
+      const mergedData = {
+        ...seedData,
+        contributionCalendar: generateContributionCalendar(seedData.totalContributions),
+        isActive: true,
+        lastFetchedAt: new Date(),
+        lastAnalyticsUpdate: new Date(),
+      };
+
+      if (liveData) {
+        if (liveData.bio) mergedData.bio = liveData.bio;
+        if (liveData.company) mergedData.company = liveData.company;
+        if (liveData.location) mergedData.location = liveData.location;
+        if (liveData.followers) mergedData.followers = liveData.followers;
+        if (liveData.public_repos) mergedData.publicRepos = liveData.public_repos;
+      }
+
+      // Upsert User
+      const user = await User.findOneAndUpdate(
+        { username: seedData.username },
+        mergedData,
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      if (user.createdAt && (Date.now() - user.createdAt.getTime()) < 5000) {
+        createdCount++;
+      } else {
+        updatedCount++;
+      }
+
+      // Generate daily & 30d Analytics snapshots for rich charts & comparisons
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));
+
+      await Analytics.findOneAndUpdate(
+        { userId: user._id, period: '30d' },
+        {
+          userId: user._id,
+          githubUsername: user.username,
+          username: user.username,
+          period: '30d',
+          startDate: thirtyDaysAgo,
+          endDate: now,
+          commits: Math.round(user.totalCommits * 0.15),
+          pullRequests: Math.round(user.totalPullRequests * 0.15),
+          issues: Math.round(user.totalIssues * 0.15),
+          reviews: Math.round(user.totalReviews * 0.15),
+          additions: Math.round(user.totalCommits * 45),
+          deletions: Math.round(user.totalCommits * 18),
+          totalContributions: Math.round(user.totalContributions * 0.15),
+          streak: {
+            current: user.contributionStreak || 15,
+            longest: user.longestStreak || 60,
+          },
+          languages: user.topLanguages.map(l => ({
+            name: l.name,
+            bytes: l.bytes,
+            percentage: l.percentage,
+            color: l.color
+          }))
+        },
+        { upsert: true, new: true }
+      );
+
+      // Create 7 daily timeline points for trend charts
+      for (let d = 6; d >= 0; d--) {
+        const pointDate = new Date();
+        pointDate.setDate(now.getDate() - d);
+        pointDate.setHours(0, 0, 0, 0);
+
+        const dayCommits = Math.max(1, Math.floor(user.totalCommits / 365) + Math.floor(Math.random() * 5));
+        await Analytics.findOneAndUpdate(
+          { userId: user._id, date: pointDate, period: 'daily' },
+          {
+            userId: user._id,
+            githubUsername: user.username,
+            username: user.username,
+            date: pointDate,
+            period: 'daily',
+            commits: dayCommits,
+            pullRequests: Math.floor(Math.random() * 3),
+            issues: Math.floor(Math.random() * 2),
+            reviews: Math.floor(Math.random() * 4),
+            totalContributions: dayCommits + 2,
+          },
+          { upsert: true, new: true }
+        );
+      }
+
+      console.log(`  ✓ Saved ${user.username} (Contributions: ${user.totalContributions}, Followers: ${user.followers})`);
+    } catch (userErr) {
+      console.error(`  ✗ Error processing ${seedData.username}:`, userErr.message);
+    }
+  }
+
+  console.log('\n=============================================');
+  console.log(`🎉 Seeding Complete!`);
+  console.log(`   Created/Updated Developers: ${SEED_USERS.length}`);
+  console.log(`   Ready for leaderboard & analytics testing!`);
+  console.log('=============================================\n');
+
+  await mongoose.disconnect();
+  process.exit(0);
+}
+
+seedDatabase().catch((err) => {
+  console.error('Fatal seed error:', err);
+  process.exit(1);
+});

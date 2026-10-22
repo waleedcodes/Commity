@@ -199,3 +199,204 @@ class AnalyticsService {
             },
             { $sort: { totalMetric: -1 } },
             { $limit: 100 }
+          ]);
+
+          // Previous period for comparison
+          const previousStart = new Date(dateRange.start);
+          const previousEnd = new Date(dateRange.end);
+          const periodDays = Math.floor((dateRange.end - dateRange.start) / (1000 * 60 * 60 * 24));
+          
+          previousStart.setDate(previousStart.getDate() - periodDays);
+          previousEnd.setDate(previousEnd.getDate() - periodDays);
+
+          const previousData = await Analytics.aggregate([
+            {
+              $match: {
+                date: { $gte: previousStart, $lte: previousEnd }
+              }
+            },
+            {
+              $group: {
+                _id: '$username',
+                totalMetric: { $sum: `$${metric}` }
+              }
+            }
+          ]);
+
+          // Create lookup map for previous data
+          const previousMap = new Map();
+          previousData.forEach(item => {
+            previousMap.set(item._id, item.totalMetric);
+          });
+
+          // Calculate trends
+          const trendingUsers = currentData.map(current => {
+            const previous = previousMap.get(current._id) || 0;
+            const growth = previous > 0 ? ((current.totalMetric - previous) / previous) * 100 : 0;
+            
+            return {
+              username: current._id,
+              current: current.totalMetric,
+              previous,
+              growth: Math.round(growth),
+              avgDaily: Math.round(current.avgDaily * 100) / 100,
+              trend: growth > 10 ? 'rising' : growth < -10 ? 'falling' : 'stable'
+            };
+          });
+
+          return {
+            metric,
+            period,
+            users: trendingUsers,
+            summary: {
+              totalUsers: currentData.length,
+              avgGrowth: Math.round(trendingUsers.reduce((sum, user) => sum + user.growth, 0) / trendingUsers.length),
+              risingCount: trendingUsers.filter(u => u.trend === 'rising').length,
+              fallingCount: trendingUsers.filter(u => u.trend === 'falling').length,
+            }
+          };
+        },
+        20 * 60 // 20 minutes cache
+      );
+    } catch (error) {
+      logger.error(`Error calculating trending for ${metric}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get leaderboard data
+   * @param {string} category - Category (commits, followers, etc.)
+   * @param {Object} filters - Filter options
+   * @param {number} limit - Number of results
+   * @returns {Array} Leaderboard data
+   */
+  static async getLeaderboard(category = 'commits', filters = {}, limit = 100) {
+    try {
+      const cacheKey = CacheManager.generateKey('leaderboard', category, JSON.stringify(filters), limit);
+      
+      return await CacheManager.getOrSet(
+        CACHE_KEYS.LEADERBOARD,
+        cacheKey,
+        async () => {
+          let sortField;
+          switch (category) {
+            case 'commits':
+              sortField = 'totalCommits';
+              break;
+            case 'pullRequests':
+              sortField = 'totalPullRequests';
+              break;
+            case 'issues':
+              sortField = 'totalIssues';
+              break;
+            case 'followers':
+              sortField = 'followers';
+              break;
+            case 'repositories':
+              sortField = 'publicRepos';
+              break;
+            default:
+              sortField = 'totalCommits';
+          }
+
+          const query = { isActive: true };
+          
+          // Apply filters
+          if (filters.location) {
+            query.location = { $regex: filters.location, $options: 'i' };
+          }
+          
+          if (filters.language) {
+            query['topLanguages.name'] = { $regex: filters.language, $options: 'i' };
+          }
+
+          if (filters.minValue) {
+            query[sortField] = { $gte: parseInt(filters.minValue) };
+          }
+
+          const users = await User.find(query)
+            .sort({ [sortField]: -1, createdAt: 1 })
+            .limit(parseInt(limit))
+            .select('username name avatarUrl location topLanguages totalCommits totalPullRequests totalIssues followers publicRepos')
+            .lean();
+
+          return users.map((user, index) => ({
+            rank: index + 1,
+            ...user,
+            categoryValue: user[sortField] || 0,
+            score: this._calculateUserScore(user),
+          }));
+        },
+        15 * 60 // 15 minutes cache
+      );
+    } catch (error) {
+      logger.error(`Error getting leaderboard for ${category}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get platform statistics
+   * @param {string} period - Time period
+   * @returns {Object} Platform statistics
+   */
+  static async getPlatformStats(period = '30d') {
+    try {
+      const cacheKey = CacheManager.generateKey('platform_stats', period);
+      
+      return await CacheManager.getOrSet(
+        CACHE_KEYS.ANALYTICS,
+        cacheKey,
+        async () => {
+          const dateRange = Helpers.getDateRange(period);
+          
+          const [
+            totalUsers,
+            activeUsers,
+            totalContributions,
+            languageDistribution,
+            locationDistribution
+          ] = await Promise.all([
+            User.countDocuments({ isActive: true }),
+            
+            User.countDocuments({
+              isActive: true,
+              lastAnalyticsUpdate: { $gte: dateRange.start }
+            }),
+            
+            Analytics.aggregate([
+              {
+                $match: {
+                  date: { $gte: dateRange.start, $lte: dateRange.end }
+                }
+              },
+              {
+                $group: {
+                  _id: null,
+                  totalCommits: { $sum: '$commits' },
+                  totalPullRequests: { $sum: '$pullRequests' },
+                  totalIssues: { $sum: '$issues' },
+                  totalReviews: { $sum: '$reviews' }
+                }
+              }
+            ]),
+            
+            User.aggregate([
+              { $match: { isActive: true } },
+              { $unwind: '$topLanguages' },
+              {
+                $group: {
+                  _id: '$topLanguages.name',
+                  userCount: { $sum: 1 },
+                  avgPercentage: { $avg: '$topLanguages.percentage' }
+                }
+              },
+              { $sort: { userCount: -1 } },
+              { $limit: 20 }
+            ]),
+            
+            User.aggregate([
+              { 
+                $match: { 
+                  isActive: true,

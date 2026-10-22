@@ -17,7 +17,7 @@ class LeaderboardController {
    */
   static getLeaderboard = asyncHandler(async (req, res) => {
     const {
-      category = 'commits',
+      category = 'contributions',
       period = 'all_time',
       location,
       language,
@@ -129,15 +129,62 @@ class LeaderboardController {
 
         // Execute query
         const skip = (page - 1) * limit;
-        const users = await User.find(query)
-          .sort({ [sortField]: -1, createdAt: 1 })
-          .skip(skip)
-          .limit(parseInt(limit))
-          .select('-contributionCalendar -recentRepos -__v')
-          .lean();
+        let users;
+        let totalCount;
 
-        // Get total count for pagination
-        const totalCount = await User.countDocuments(query);
+        if (location) {
+          let rankField = 'countryRankAll';
+          if (category === 'commits') rankField = 'countryRankCommits';
+          else if (category === 'public_contributions') rankField = 'countryRankPublic';
+
+          const pipeline = [
+            { $match: query },
+            {
+              $addFields: {
+                hasOfficialRank: {
+                  $cond: [{ $ifNull: [`$${rankField}`, false] }, 0, 1]
+                },
+                effectiveRank: {
+                  $ifNull: [`$${rankField}`, 999999]
+                }
+              }
+            },
+            {
+              $sort: {
+                hasOfficialRank: 1,
+                effectiveRank: 1,
+                [sortField]: -1,
+                createdAt: 1
+              }
+            },
+            { $skip: skip },
+            { $limit: parseInt(limit) },
+            {
+              $project: {
+                contributionCalendar: 0,
+                recentRepos: 0,
+                __v: 0,
+                hasOfficialRank: 0,
+                effectiveRank: 0
+              }
+            }
+          ];
+
+          [users, totalCount] = await Promise.all([
+            User.aggregate(pipeline),
+            User.countDocuments(query)
+          ]);
+        } else {
+          [users, totalCount] = await Promise.all([
+            User.find(query)
+              .sort({ [sortField]: -1, createdAt: 1 })
+              .skip(skip)
+              .limit(parseInt(limit))
+              .select('-contributionCalendar -recentRepos -__v')
+              .lean(),
+            User.countDocuments(query)
+          ]);
+        }
 
         // Add rank numbers (respect authoritative committers.top rank when filtered by country/location)
         const rankedUsers = users.map((user, index) => {
@@ -628,26 +675,14 @@ class LeaderboardController {
           source: user.countryRankAll ? 'committers.top' : 'calculated',
         };
       } else {
-        const locationRank = await User.countDocuments({
-          totalCommits: { $gt: user.totalCommits },
-          location: { $regex: user.location, $options: 'i' },
-          isActive: true,
-          accountType: { $ne: 'Organization' },
-        }) + 1;
-
-        const locationTotal = await User.countDocuments({
-          location: { $regex: user.location, $options: 'i' },
-          isActive: true,
-          accountType: { $ne: 'Organization' },
-        });
-
         rankings.location = {
-          rank: locationTotal >= MIN_USERS ? locationRank : null,
-          total: locationTotal,
-          percentile: locationTotal >= MIN_USERS ? Math.round((1 - (locationRank - 1) / locationTotal) * 100) : null,
+          rank: null,
+          total: 0,
+          percentile: null,
           value: user.totalCommits,
           category: 'location',
           locationName: user.location,
+          source: 'pending_sync',
         };
       }
     }

@@ -316,3 +316,321 @@ class LeaderboardController {
             }},
             { $sort: { totalUsers: -1 } },
             { $limit: 10 }
+          ]),
+          User.find({ isActive: true })
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .select('username name avatarUrl totalCommits followers createdAt')
+        ]);
+
+        const commitsSum = totalCommits[0]?.total || 0;
+        const reposSum = totalRepos[0]?.total || 0;
+        const followersSum = totalFollowers[0]?.total || 0;
+
+        return {
+          totalUsers,
+          totalContributors: totalUsers,
+          totalContributions: commitsSum,
+          totalCommits: commitsSum,
+          totalRepositories: reposSum,
+          totalFollowers: followersSum,
+          activeThisMonth: totalUsers,
+          newThisWeek: recentUsers.length,
+          overview: {
+            totalUsers,
+            totalContributors: totalUsers,
+            totalContributions: commitsSum,
+            totalCommits: commitsSum,
+            totalRepositories: reposSum,
+            totalFollowers: followersSum,
+            activeThisMonth: totalUsers,
+            newThisWeek: recentUsers.length,
+            averageCommitsPerUser: totalUsers > 0 ? Math.round(commitsSum / totalUsers) : 0,
+            averageReposPerUser: totalUsers > 0 ? Math.round(reposSum / totalUsers) : 0,
+          },
+          topCountries: (() => {
+            const countryMap = new Map();
+            for (const item of (topCountries || [])) {
+              const country = Helpers.normalizeCountry(item._id);
+              if (!country) continue;
+              countryMap.set(country, (countryMap.get(country) || 0) + item.count);
+            }
+            return Array.from(countryMap.entries())
+              .map(([name, userCount]) => ({ name, userCount }))
+              .sort((a, b) => b.userCount - a.userCount)
+              .slice(0, 10);
+          })(),
+          topLanguages: topLanguages.map(lang => ({
+            name: lang._id,
+            userCount: lang.totalUsers,
+            averageUsage: Math.round(lang.avgPercentage),
+          })),
+          recentUsers: recentUsers.map(user => ({
+            username: user.username,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+            totalCommits: user.totalCommits,
+            followers: user.followers,
+            joinedAt: user.createdAt,
+          })),
+        };
+      },
+      30 * 60 // 30 minutes cache
+    );
+
+    res.json({
+      success: true,
+      data: stats,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Get top contributors
+   * @route   GET /api/leaderboard/contributors
+   * @access  Public
+   */
+  static getTopContributors = asyncHandler(async (req, res) => {
+    const { 
+      category = 'commits',
+      period = 'all_time',
+      limit = 50 
+    } = req.query;
+
+    const cacheKey = CacheManager.generateKey('top_contributors', category, period);
+
+    const contributors = await CacheManager.getOrSet(
+      CACHE_KEYS.LEADERBOARD,
+      cacheKey,
+      async () => {
+        let sortField;
+        switch (category) {
+          case 'commits':
+            sortField = 'totalCommits';
+            break;
+          case 'pullRequests':
+            sortField = 'totalPullRequests';
+            break;
+          case 'issues':
+            sortField = 'totalIssues';
+            break;
+          case 'reviews':
+            sortField = 'totalReviews';
+            break;
+          default:
+            sortField = 'totalCommits';
+        }
+
+        const topUsers = await User.find({ 
+          isActive: true,
+          accountType: { $ne: 'Organization' },
+          [sortField]: { $gt: 0 }
+        })
+        .sort({ [sortField]: -1 })
+        .limit(parseInt(limit))
+        .select('username name avatarUrl location topLanguages totalCommits totalPullRequests totalIssues totalReviews followers')
+        .lean();
+
+        return topUsers.map((user, index) => ({
+          rank: index + 1,
+          username: user.username,
+          name: user.name,
+          avatarUrl: user.avatarUrl,
+          location: user.location,
+          primaryLanguage: user.topLanguages?.[0]?.name || null,
+          categoryValue: user[sortField] || 0,
+          totalContributions: (user.totalCommits || 0) + (user.totalPullRequests || 0) + 
+                            (user.totalIssues || 0) + (user.totalReviews || 0),
+          followers: user.followers || 0,
+          score: this._calculateContributorScore(user),
+        }));
+      },
+      20 * 60 // 20 minutes cache
+    );
+
+    res.json({
+      success: true,
+      data: {
+        contributors,
+        category,
+        period,
+        totalContributors: contributors.length,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Get top repositories
+   * @route   GET /api/leaderboard/repositories
+   * @access  Public
+   */
+  static getTopRepositories = asyncHandler(async (req, res) => {
+    const { 
+      sort = 'stars',
+      language,
+      limit = 50 
+    } = req.query;
+
+    const cacheKey = CacheManager.generateKey('top_repositories', sort, language || 'all');
+
+    const repositories = await CacheManager.getOrSet(
+      CACHE_KEYS.LEADERBOARD,
+      cacheKey,
+      async () => {
+        // Aggregate repositories from users
+        const pipeline = [
+          { $match: { isActive: true } },
+          { $unwind: '$recentRepos' },
+        ];
+
+        if (language) {
+          pipeline.push({
+            $match: { 'recentRepos.language': { $regex: language, $options: 'i' } }
+          });
+        }
+
+        let sortField;
+        switch (sort) {
+          case 'stars':
+            sortField = 'recentRepos.stargazersCount';
+            break;
+          case 'forks':
+            sortField = 'recentRepos.forksCount';
+            break;
+          case 'updated':
+            sortField = 'recentRepos.updatedAt';
+            break;
+          default:
+            sortField = 'recentRepos.stargazersCount';
+        }
+
+        pipeline.push(
+          { $sort: { [sortField]: -1 } },
+          { $limit: parseInt(limit) },
+          {
+            $project: {
+              name: '$recentRepos.name',
+              fullName: '$recentRepos.fullName',
+              description: '$recentRepos.description',
+              language: '$recentRepos.language',
+              stars: '$recentRepos.stargazersCount',
+              forks: '$recentRepos.forksCount',
+              updatedAt: '$recentRepos.updatedAt',
+              htmlUrl: '$recentRepos.htmlUrl',
+              owner: {
+                username: '$username',
+                name: '$name',
+                avatarUrl: '$avatarUrl',
+              },
+            }
+          }
+        );
+
+        const topRepos = await User.aggregate(pipeline);
+
+        return topRepos.map((repo, index) => ({
+          rank: index + 1,
+          ...repo,
+          score: (repo.stars || 0) + (repo.forks || 0) * 2,
+        }));
+      },
+      25 * 60 // 25 minutes cache
+    );
+
+    res.json({
+      success: true,
+      data: {
+        repositories,
+        sort,
+        language: language || null,
+        totalRepositories: repositories.length,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Get leaderboard filtered by location
+   * @route   GET /api/leaderboard/location/:location
+   * @access  Public
+   */
+  static getLeaderboardByLocation = asyncHandler(async (req, res) => {
+    const { location } = req.params;
+    const { 
+      category = 'commits',
+      page = 1,
+      limit = 50 
+    } = req.query;
+
+    // Use the main leaderboard method with location filter
+    req.query.location = location;
+    await LeaderboardController.getLeaderboard(req, res);
+  });
+
+  /**
+   * @desc    Get leaderboard filtered by programming language
+   * @route   GET /api/leaderboard/language/:language
+   * @access  Public
+   */
+  static getLeaderboardByLanguage = asyncHandler(async (req, res) => {
+    const { language } = req.params;
+    const { 
+      category = 'commits',
+      page = 1,
+      limit = 50 
+    } = req.query;
+
+    // Use the main leaderboard method with language filter
+    req.query.language = language;
+    await LeaderboardController.getLeaderboard(req, res);
+  });
+
+  /**
+   * @desc    Get specific user's ranking across different categories
+   * @route   GET /api/leaderboard/user/:username
+   * @access  Public
+   */
+  static getUserRanking = asyncHandler(async (req, res) => {
+    const { username } = req.params;
+    const { categories = 'commits,followers,repositories,contributions' } = req.query;
+
+    const user = await User.findByUsername(username);
+    if (!user) {
+      throw ErrorFactory.notFound(`User '${username}' not found`);
+    }
+
+    const categoryList = categories.split(',');
+    const rankings = {};
+
+    const total = await User.countDocuments({ isActive: true, accountType: { $ne: 'Organization' } });
+    const MIN_USERS = 5;
+
+    for (const category of categoryList) {
+      let field;
+      switch (category.trim()) {
+        case 'commits':
+          field = 'totalCommits';
+          break;
+        case 'followers':
+          field = 'followers';
+          break;
+        case 'repositories':
+          field = 'publicRepos';
+          break;
+        case 'contributions':
+          field = 'totalContributions';
+          break;
+        default:
+          continue;
+      }
+
+      if (total < MIN_USERS) {
+        // Not enough data — return stored rank instead of computing a misleading one
+        rankings[category.trim()] = {
+          rank: user.globalRank || null,
+          total,
+          percentile: null,
+          value: user[field] || 0,
+          category: category.trim(),
+        };

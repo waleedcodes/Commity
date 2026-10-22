@@ -26,3 +26,18 @@ const connectDB = async () => {
     cached.promise = mongoose.connect(mongoURI, options).then((m) => {
       logger.info(`🍃 MongoDB Connected: ${m.connection.host}`);
       return m;
+    });
+  }
+
+  try {
+    cached.conn = await cached.promise;
+  } catch (error) {
+    cached.promise = null;
+    logger.error('Error connecting to MongoDB:', error.message);
+    throw error;
+  }
+
+  return cached.conn;
+};
+
+module.exports = connectDB;

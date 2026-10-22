@@ -179,3 +179,185 @@ class GitHubService {
         } catch (error) {
           if (error.status === 404) {
             throw ErrorFactory.notFound(`GitHub user '${username}' not found`);
+          }
+          throw ErrorFactory.githubAPI(`Failed to fetch events: ${error.message}`, error.status);
+        }
+      },
+      2 * 60 // 2 minutes cache (events are more dynamic)
+    );
+  }
+
+  /**
+   * Get user's contribution activity using GraphQL
+   * @param {string} username - GitHub username
+   * @returns {Promise<object>} Contribution data
+   */
+  async getUserContributions(username) {
+    const cacheKey = CacheManager.generateKey('user_contributions', username);
+    
+    return await CacheManager.getOrSet(
+      CACHE_KEYS.USER_PROFILE,
+      cacheKey,
+      async () => {
+        try {
+          logger.info(`Fetching contributions for: ${username}`);
+          
+          const query = `
+            query userContributionCalendar($username: String!) {
+              user(login: $username) {
+                contributionsCollection {
+                  restrictedContributionsCount
+                  contributionCalendar {
+                    totalContributions
+                    weeks {
+                      contributionDays {
+                        contributionCount
+                        date
+                        contributionLevel
+                      }
+                    }
+                  }
+                  totalCommitContributions
+                  totalIssueContributions
+                  totalPullRequestContributions
+                  totalPullRequestReviewContributions
+                  totalRepositoryContributions
+                }
+                repositories(first: 100, orderBy: {field: STARGAZERS, direction: DESC}) {
+                  nodes {
+                    name
+                    stargazerCount
+                    primaryLanguage {
+                      name
+                      color
+                    }
+                  }
+                }
+              }
+            }
+          `;
+
+          const { user } = await this.graphql(query, { username });
+
+          if (!user) {
+            throw ErrorFactory.notFound(`GitHub user '${username}' not found`);
+          }
+
+          const publicContribs = user.contributionsCollection.contributionCalendar?.totalContributions || 0;
+          const privateContribs = user.contributionsCollection.restrictedContributionsCount || 0;
+
+            const calendarDays = user.contributionsCollection.contributionCalendar.weeks
+              .flatMap(week => week.contributionDays)
+              .map(day => ({
+                date: new Date(day.date),
+                contributionCount: day.contributionCount,
+                contributionLevel: day.contributionLevel,
+              }));
+
+            // Calculate exact longest and current streaks from verified calendar
+            let longestStreak = 0;
+            let running = 0;
+            for (let i = 0; i < calendarDays.length; i++) {
+              if (calendarDays[i].contributionCount > 0) {
+                running++;
+                if (running > longestStreak) longestStreak = running;
+              } else {
+                running = 0;
+              }
+            }
+
+            let currentStreak = 0;
+            const lastIdx = calendarDays.length - 1;
+            if (lastIdx >= 0) {
+              let startIdx = lastIdx;
+              if (calendarDays[lastIdx].contributionCount === 0 && lastIdx > 0 && calendarDays[lastIdx - 1].contributionCount > 0) {
+                startIdx = lastIdx - 1;
+              }
+              for (let i = startIdx; i >= 0; i--) {
+                if (calendarDays[i].contributionCount > 0) {
+                  currentStreak++;
+                } else {
+                  break;
+                }
+              }
+            }
+
+            const contributionsData = {
+              totalContributions: publicContribs + privateContribs,
+              publicContributions: publicContribs,
+              privateContributions: privateContribs,
+              totalCommits: user.contributionsCollection.totalCommitContributions || 0,
+              totalIssues: user.contributionsCollection.totalIssueContributions || 0,
+              totalPullRequests: user.contributionsCollection.totalPullRequestContributions || 0,
+              totalReviews: user.contributionsCollection.totalPullRequestReviewContributions || 0,
+              totalRepositories: user.contributionsCollection.totalRepositoryContributions || 0,
+              contributionStreak: currentStreak,
+              longestStreak: longestStreak,
+              contributionCalendar: calendarDays,
+              topRepositories: user.repositories.nodes.map(repo => ({
+                name: repo.name,
+                stars: repo.stargazerCount,
+                language: repo.primaryLanguage?.name || null,
+                languageColor: repo.primaryLanguage?.color || null,
+              })),
+            };
+
+          logger.info(`Successfully fetched contributions for: ${username}`);
+          return contributionsData;
+        } catch (error) {
+          if (error.message && error.message.includes('Could not resolve to a User')) {
+            logger.info(`GitHub login '${username}' is not a User account (likely an Organization). Returning zeroed contribution metrics.`);
+            return {
+              totalContributions: 0,
+              publicContributions: 0,
+              privateContributions: 0,
+              totalCommits: 0,
+              totalIssues: 0,
+              totalPullRequests: 0,
+              totalReviews: 0,
+              totalRepositories: 0,
+              contributionStreak: 0,
+              longestStreak: 0,
+              contributionCalendar: [],
+              topRepositories: [],
+            };
+          }
+          logger.warn(`GraphQL contributions fetch failed for ${username}, falling back to defaults: ${error.message}`);
+          return {
+            totalContributions: 0,
+            publicContributions: 0,
+            privateContributions: 0,
+            totalCommits: 0,
+            totalIssues: 0,
+            totalPullRequests: 0,
+            totalReviews: 0,
+            totalRepositories: 0,
+            contributionStreak: 0,
+            longestStreak: 0,
+            contributionCalendar: [],
+            topRepositories: [],
+          };
+        }
+      },
+      10 * 60 // 10 minutes cache
+    );
+  }
+
+  /**
+   * Get user's language statistics
+   * @param {string} username - GitHub username
+   * @returns {Promise<Array>} Language statistics
+   */
+  async getUserLanguages(username) {
+    const cacheKey = CacheManager.generateKey('user_languages', username);
+    
+    return await CacheManager.getOrSet(
+      CACHE_KEYS.USER_PROFILE,
+      cacheKey,
+      async () => {
+        try {
+          logger.info(`Fetching language statistics for: ${username}`);
+          
+          const repositories = await this.getUserRepositories(username, { type: 'owner' });
+          const languageStats = {};
+          let totalBytes = 0;

@@ -28,3 +28,18 @@ async function handleSync(request) {
     
     // Run weekly sync cycle
     const result = await syncWorker.runWeeklySync();
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Weekly snapshot sync completed successfully',
+      timestamp: new Date().toISOString(),
+      result,
+    });
+  } catch (error) {
+    logger.error('Error executing sync endpoint:', error.message);
+    return NextResponse.json(
+      { success: false, error: error.message },
+      { status: 500 }
+    );
+  }
+}

@@ -99,3 +99,104 @@ const authenticateAPIKey = (req, res, next) => {
     return next(ErrorFactory.unauthorized('Invalid API key'));
   }
 
+  // Add API key info to request
+  req.apiKey = {
+    key: apiKey,
+    type: 'service',
+  };
+
+  next();
+};
+
+/**
+ * Rate limiting by user
+ * Applies different limits based on user type
+ */
+const rateLimitByUser = (req, res, next) => {
+  if (!req.user) {
+    return next();
+  }
+
+  // Different limits for different user types
+  const limits = {
+    admin: 1000,     // requests per hour
+    premium: 500,    // requests per hour
+    user: 100,       // requests per hour
+  };
+
+  const userLimit = limits[req.user.role] || limits.user;
+  
+  // Add limit info to request for potential use by rate limiting middleware
+  req.rateLimit = {
+    max: userLimit,
+    windowMs: 60 * 60 * 1000, // 1 hour
+    keyGenerator: () => `user_${req.user.id}`,
+  };
+
+  next();
+};
+
+/**
+ * Check if user owns the resource or is admin
+ * Middleware factory for resource ownership validation
+ */
+const requireOwnership = (resourceIdParam = 'id', userIdField = 'userId') => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return next(ErrorFactory.unauthorized('Authentication required'));
+    }
+
+    // Admins can access any resource
+    if (req.user.role === 'admin') {
+      return next();
+    }
+
+    const resourceId = req.params[resourceIdParam];
+    
+    if (!resourceId) {
+      return next(ErrorFactory.badRequest(`Missing ${resourceIdParam} parameter`));
+    }
+
+    try {
+      // For user resources, check if user is accessing their own data
+      if (resourceIdParam === 'userId' || resourceIdParam === 'username') {
+        if (req.user.id !== resourceId && req.user.username !== resourceId) {
+          return next(ErrorFactory.forbidden('Access denied. You can only access your own resources.'));
+        }
+        return next();
+      }
+
+      // For other resources, you might need to fetch the resource and check ownership
+      // This is a placeholder - implement based on your specific resource models
+      // Example:
+      // const resource = await SomeModel.findById(resourceId);
+      // if (!resource) {
+      //   return next(ErrorFactory.notFound('Resource not found'));
+      // }
+      // if (resource[userIdField] !== req.user.id) {
+      //   return next(ErrorFactory.forbidden('Access denied'));
+      // }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+/**
+ * GitHub token validation middleware
+ * Ensures GitHub token is valid and has required scopes
+ */
+const validateGitHubToken = async (req, res, next) => {
+  const githubToken = req.headers['x-github-token'] || req.body.githubToken;
+
+  if (!githubToken) {
+    return next(ErrorFactory.badRequest('GitHub token required'));
+  }
+
+  try {
+    // Validate token with GitHub API
+    const { verifyGitHubToken } = require('../config/github');
+    const tokenInfo = await verifyGitHubToken();
+

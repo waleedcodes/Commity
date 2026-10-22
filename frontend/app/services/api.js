@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] api.js
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class ApiService {

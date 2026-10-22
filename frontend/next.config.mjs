@@ -1,5 +1,7 @@
-// [Commity Phase 1 Scaffolding] next.config.mjs
+// [Commity Phase 2 Logic] next.config.mjs
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  serverExternalPackages: ['mongoose'],
+};
 
 export default nextConfig;

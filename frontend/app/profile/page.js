@@ -1,3 +1,4 @@
+// [Commity Phase 1 Scaffolding] page.js
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';

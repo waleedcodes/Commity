@@ -23,3 +23,28 @@ const logger = {
     if (process.env.NODE_ENV !== 'production') {
       console.log(`🐛 ${formatMessage('DEBUG', message, meta)}`);
     }
+  },
+  http: (message, meta) => {
+    console.log(`🌐 ${formatMessage('HTTP', message, meta)}`);
+  },
+
+  // Helper methods for structured logging
+  logAPICall: (method, url, statusCode, duration, error = null) => {
+    const logData = { method, url, statusCode, duration: `${duration}ms` };
+    if (error) {
+      logData.error = error.message;
+      logger.error(`API Call Failed: ${JSON.stringify(logData)}`);
+    } else {
+      logger.info(`API Call: ${JSON.stringify(logData)}`);
+    }
+  },
+
+  logGitHubAPI: (endpoint, rateLimit, error = null) => {
+    const logData = {
+      endpoint,
+      rateLimit: {
+        remaining: rateLimit?.remaining || 0,
+        limit: rateLimit?.limit || 0,
+        resetTime: rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
+      },
+    };

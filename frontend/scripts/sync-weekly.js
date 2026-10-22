@@ -16,3 +16,12 @@ async function run() {
     await syncWorker.runWeeklySync();
 
     logger.info('🎉 Weekly synchronization finished successfully!');
+    process.exit(0);
+  } catch (err) {
+    logger.error('Fatal error during sync script:', err.message || err);
+    console.error(err);
+    process.exit(1);
+  }
+}
+
+run();

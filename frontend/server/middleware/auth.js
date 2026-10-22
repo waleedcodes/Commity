@@ -200,3 +200,104 @@ const validateGitHubToken = async (req, res, next) => {
     const { verifyGitHubToken } = require('../config/github');
     const tokenInfo = await verifyGitHubToken();
 
+    if (!tokenInfo.valid) {
+      return next(ErrorFactory.unauthorized('Invalid GitHub token'));
+    }
+
+    // Add GitHub user info to request
+    req.githubUser = tokenInfo.user;
+    req.githubScopes = tokenInfo.scopes;
+
+    next();
+  } catch (error) {
+    next(ErrorFactory.unauthorized('GitHub token validation failed'));
+  }
+};
+
+/**
+ * Require specific GitHub scopes
+ */
+const requireGitHubScopes = (...requiredScopes) => {
+  return (req, res, next) => {
+    if (!req.githubScopes) {
+      return next(ErrorFactory.unauthorized('GitHub authentication required'));
+    }
+
+    const hasRequiredScopes = requiredScopes.every(scope => 
+      req.githubScopes.includes(scope)
+    );
+
+    if (!hasRequiredScopes) {
+      return next(ErrorFactory.forbidden(
+        `Missing required GitHub scopes: ${requiredScopes.join(', ')}`
+      ));
+    }
+
+    next();
+  };
+};
+
+/**
+ * User account status validation
+ * Ensures user account is active and verified if required
+ */
+const requireActiveAccount = (requireVerification = false) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return next(ErrorFactory.unauthorized('Authentication required'));
+    }
+
+    if (!req.user.isActive) {
+      return next(ErrorFactory.forbidden('Account is deactivated'));
+    }
+
+    if (requireVerification && !req.user.isVerified) {
+      return next(ErrorFactory.forbidden('Account verification required'));
+    }
+
+    next();
+  };
+};
+
+/**
+ * Request logging middleware
+ * Logs authentication-related requests
+ */
+const logAuthRequests = (req, res, next) => {
+  const logData = {
+    method: req.method,
+    url: req.originalUrl,
+    ip: req.ip,
+    userAgent: req.get('User-Agent'),
+    timestamp: new Date().toISOString(),
+  };
+
+  // Add user info if available
+  if (req.user) {
+    logData.userId = req.user.id;
+    logData.username = req.user.username;
+    logData.role = req.user.role;
+  }
+
+  // Add API key info if available
+  if (req.apiKey) {
+    logData.apiKeyType = req.apiKey.type;
+  }
+
+  logger.info(`Auth Request: ${JSON.stringify(logData)}`);
+  next();
+};
+
+module.exports = {
+  authenticateToken,
+  optionalAuth,
+  requireRole,
+  requireAdmin,
+  authenticateAPIKey,
+  rateLimitByUser,
+  requireOwnership,
+  validateGitHubToken,
+  requireGitHubScopes,
+  requireActiveAccount,
+  logAuthRequests,
+};

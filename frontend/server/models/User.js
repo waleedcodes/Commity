@@ -128,3 +128,133 @@ const userSchema = new mongoose.Schema({
       enum: ['NONE', 'FIRST_QUARTILE', 'SECOND_QUARTILE', 'THIRD_QUARTILE', 'FOURTH_QUARTILE'],
       default: 'NONE',
     },
+  }],
+  
+  // Top languages
+  topLanguages: [{
+    name: {
+      type: String,
+      required: true,
+    },
+    percentage: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 100,
+    },
+    bytes: Number,
+    color: String,
+  }],
+  
+  // Recent repositories
+  recentRepos: [{
+    name: {
+      type: String,
+      required: true,
+    },
+    fullName: {
+      type: String,
+      required: true,
+    },
+    description: String,
+    stargazersCount: {
+      type: Number,
+      default: 0,
+    },
+    forksCount: {
+      type: Number,
+      default: 0,
+    },
+    language: String,
+    updatedAt: Date,
+    htmlUrl: String,
+  }],
+  
+  // Ranking information
+  globalRank: {
+    type: Number,
+    index: true,
+  },
+  countryRank: Number, // Primary rank (defaults to countryRankAll)
+  countryRankAll: Number, // Rank in All (Public + Private contributions)
+  countryRankPublic: Number, // Rank in Contributions (Public only)
+  countryRankCommits: Number, // Rank in Commits only
+  cityRank: Number,
+  
+  // Last data fetch & analytics
+  lastFetchedAt: {
+    type: Date,
+    default: Date.now,
+    index: true,
+  },
+  lastAnalyticsUpdate: {
+    type: Date,
+    default: Date.now,
+    index: true,
+  },
+  
+  // Application metadata
+  isActive: {
+    type: Boolean,
+    default: true,
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  isPremium: {
+    type: Boolean,
+    default: false,
+  },
+  accountType: {
+    type: String,
+    enum: ['User', 'Organization'],
+    default: 'User',
+    index: true,
+  },
+  contributionSource: {
+    type: String,
+    enum: ['github_graphql', 'github_rest', 'unverified'],
+    default: 'github_graphql',
+  },
+  dataQuality: {
+    type: String,
+    enum: ['verified', 'estimated', 'unverified'],
+    default: 'verified',
+  },
+  statsUpdatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+}, {
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true },
+});
+
+// Indexes for performance
+userSchema.index({ username: 1 });
+userSchema.index({ githubId: 1 });
+userSchema.index({ totalCommits: -1 });
+userSchema.index({ totalContributions: -1 });
+userSchema.index({ followers: -1 });
+userSchema.index({ globalRank: 1 });
+userSchema.index({ location: 1 });
+userSchema.index({ lastFetchedAt: 1 });
+userSchema.index({ lastAnalyticsUpdate: 1 });
+userSchema.index({ isActive: 1, isVerified: 1 });
+
+// High performance compound indexes for scaling leaderboards & queries
+userSchema.index({ accountType: 1 });
+userSchema.index({ isActive: 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, totalCommits: -1 });
+userSchema.index({ isActive: 1, followers: -1 });
+userSchema.index({ isActive: 1, publicRepos: -1 });
+userSchema.index({ isActive: 1, longestStreak: -1 });
+userSchema.index({ isActive: 1, location: 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, 'topLanguages.name': 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, lastAnalyticsUpdate: -1 });
+userSchema.index({ isActive: 1, accountType: 1, totalContributions: -1 });
+userSchema.index({ isActive: 1, accountType: 1, totalCommits: -1 });
+userSchema.index({ isActive: 1, accountType: 1, followers: -1 });
+userSchema.index({ isActive: 1, accountType: 1, longestStreak: -1 });

@@ -56,3 +56,62 @@ router.get('/:username/streak.svg',
   validateGitHubUsername,
   UserController.getUserStreakSvg
 );
+
+/**
+ * @route   GET /api/users/:username/streak
+ * @desc    Get authentic GitHub contribution streak statistics
+ * @access  Public
+ */
+router.get('/:username/streak',
+  validateGitHubUsername,
+  UserController.getUserStreakStats
+);
+
+/**
+ * @route   GET /api/users/:username/wrapped
+ * @desc    Get GitHub Developer Wrapped & Social Share insights
+ * @access  Public
+ */
+router.get('/:username/wrapped',
+  validateGitHubUsername,
+  WrappedController.getDeveloperWrapped
+);
+
+/**
+ * @route   GET /api/users/:username
+ * @desc    Get user profile by username
+ * @access  Public
+ */
+router.get('/:username',
+  validateGitHubUsername,
+  optionalAuth,
+  UserController.getUserProfile
+);
+
+/**
+ * @route   POST /api/users/:username/sync
+ * @desc    Force sync user profile with live GitHub data
+ * @access  Public
+ */
+router.post('/:username/sync',
+  validateGitHubUsername,
+  UserController.syncUserProfile
+);
+
+/**
+ * @route   PUT /api/users/:username
+ * @desc    Update user profile
+ * @access  Private (User or Admin)
+ */
+router.put('/:username',
+  validateGitHubUsername,
+  validateUserProfileUpdate,
+  requireActiveAccount(),
+  requireOwnership('username'),
+  UserController.updateUserProfile
+);
+
+/**
+ * @route   GET /api/users/:username/repositories
+ * @route   GET /api/users/:username/repos (alias)
+ * @desc    Get user repositories

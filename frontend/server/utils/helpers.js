@@ -163,3 +163,169 @@ class Helpers {
       }
     }
     
+    return {
+      start: start.toDate(),
+      end: end.toDate(),
+      startDate: start.toDate(),
+      endDate: end.toDate(),
+    };
+  }
+  
+  /**
+   * Format date for display
+   * @param {Date|string} date - Date to format
+   * @param {string} format - Moment.js format string
+   * @returns {string} Formatted date string
+   */
+  static formatDate(date, format = 'YYYY-MM-DD HH:mm:ss') {
+    return moment(date).format(format);
+  }
+  
+  /**
+   * Calculate time ago from date
+   * @param {Date|string} date - Date to calculate from
+   * @returns {string} Human-readable time ago string
+   */
+  static timeAgo(date) {
+    return moment(date).fromNow();
+  }
+  
+  /**
+   * Deep clone an object
+   * @param {any} obj - Object to clone
+   * @returns {any} Cloned object
+   */
+  static deepClone(obj) {
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
+    }
+    
+    if (obj instanceof Date) {
+      return new Date(obj.getTime());
+    }
+    
+    if (obj instanceof Array) {
+      return obj.map(item => this.deepClone(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const cloned = {};
+      Object.keys(obj).forEach(key => {
+        cloned[key] = this.deepClone(obj[key]);
+      });
+      return cloned;
+    }
+    
+    return obj;
+  }
+  
+  /**
+   * Debounce function execution
+   * @param {Function} func - Function to debounce
+   * @param {number} wait - Wait time in milliseconds
+   * @returns {Function} Debounced function
+   */
+  static debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+  
+  /**
+   * Throttle function execution
+   * @param {Function} func - Function to throttle
+   * @param {number} limit - Time limit in milliseconds
+   * @returns {Function} Throttled function
+   */
+  static throttle(func, limit) {
+    let inThrottle;
+    return function executedFunction(...args) {
+      if (!inThrottle) {
+        func.apply(this, args);
+        inThrottle = true;
+        setTimeout(() => inThrottle = false, limit);
+      }
+    };
+  }
+  
+  /**
+   * Retry function execution with exponential backoff
+   * @param {Function} fn - Function to retry
+   * @param {number} maxRetries - Maximum number of retries
+   * @param {number} baseDelay - Base delay in milliseconds
+   * @returns {Promise} Promise that resolves with function result
+   */
+  static async retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+    let lastError;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        const delay = baseDelay * Math.pow(2, attempt);
+        await this.sleep(delay);
+      }
+    }
+    
+    throw lastError;
+  }
+  
+  /**
+   * Sleep for specified milliseconds
+   * @param {number} ms - Milliseconds to sleep
+   * @returns {Promise} Promise that resolves after sleep
+   */
+  static sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  /**
+   * Check if value is empty (null, undefined, empty string, empty array, empty object)
+   * @param {any} value - Value to check
+   * @returns {boolean} True if empty
+   */
+  static isEmpty(value) {
+    if (value === null || value === undefined) {
+      return true;
+    }
+    
+    if (typeof value === 'string') {
+      return value.trim().length === 0;
+    }
+    
+    if (Array.isArray(value)) {
+      return value.length === 0;
+    }
+    
+    if (typeof value === 'object') {
+      return Object.keys(value).length === 0;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Generate pagination metadata
+   * @param {number} page - Current page
+   * @param {number} limit - Items per page
+   * @param {number} totalItems - Total number of items
+   * @returns {object} Pagination metadata
+   */
+  static generatePaginationMeta(page, limit, totalItems) {
+    const totalPages = Math.ceil(totalItems / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+    
+    return {

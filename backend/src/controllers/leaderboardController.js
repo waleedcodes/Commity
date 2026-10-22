@@ -1,3 +1,4 @@
+// [Commity Phase 1 Scaffolding] leaderboardController.js
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ErrorFactory } = require('../middleware/errorHandler');
 const User = require('../models/User');

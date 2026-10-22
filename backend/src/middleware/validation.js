@@ -1,4 +1,4 @@
-// [Commity Phase 1 Scaffolding] validation.js
+// [Commity Phase 2 Logic] validation.js
 const Joi = require('joi');
 const { ErrorFactory } = require('./errorHandler');
 const { REGEX, PAGINATION, ANALYTICS_PERIODS } = require('../config/constants');
@@ -107,7 +107,7 @@ const analyticsQuerySchema = Joi.object({
 const leaderboardQuerySchema = Joi.object({
   category: Joi.string().valid(
     'commits', 'repositories', 'followers', 'contributions', 'public_contributions', 'private_contributions', 'streak'
-  ).default('commits'),
+  ).default('contributions'),
   period: Joi.string()
     .valid(...Object.values(ANALYTICS_PERIODS), 'allTime', '1d', '7d', '30d', '90d', '365d')
     .default(ANALYTICS_PERIODS.ALL_TIME),

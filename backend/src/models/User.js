@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({

@@ -90,3 +90,50 @@ export async function handleRequest(handler, request, context = {}) {
       }
     };
 
+    const next = (err) => {
+      if (err) {
+        logger.error(`Error in route ${url.pathname}:`, err.message || err);
+        const code = err.statusCode || 500;
+        safeResolve(
+          NextResponse.json(
+            {
+              success: false,
+              error: {
+                message: err.message || 'Internal Server Error',
+                type: err.type || 'SERVER_ERROR',
+              },
+            },
+            { status: code }
+          )
+        );
+      } else {
+        safeResolve(NextResponse.json({ success: true }, { status: statusCode, headers }));
+      }
+    };
+
+    res.json = (data) => {
+      headers.set('Content-Type', 'application/json');
+      safeResolve(new NextResponse(JSON.stringify(data), { status: statusCode, headers }));
+      return res;
+    };
+
+    res.send = (data) => {
+      safeResolve(new NextResponse(data, { status: statusCode, headers }));
+      return res;
+    };
+
+    res.end = () => {
+      safeResolve(new NextResponse(null, { status: statusCode, headers }));
+      return res;
+    };
+
+    try {
+      const result = handler(req, res, next);
+      if (result && typeof result.then === 'function') {
+        result.catch(next);
+      }
+    } catch (error) {
+      next(error);
+    }
+  });
+}

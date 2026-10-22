@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] leaderboardController.js
 const { asyncHandler } = require('../middleware/errorHandler');
 const { ErrorFactory } = require('../middleware/errorHandler');
 const User = require('../models/User');

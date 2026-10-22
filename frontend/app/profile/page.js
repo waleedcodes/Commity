@@ -321,8 +321,10 @@ export default function ProfileHub() {
             role: u.bio ? u.bio.split(/[|•·]/)[0].trim() : 'Software Engineer',
             location: u.location || selectedCity,
             flag: '🇵🇰',
-            rank: `#${u.countryRankAll || u.countryRank || u.rank || (idx + 1)} ${selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1)}`,
-            rankNum: u.countryRankAll || u.countryRank || u.rank || (idx + 1),
+            rank: (u.countryRankAll || u.countryRank)
+              ? `#${u.countryRankAll || u.countryRank} PK`
+              : (u.rank ? `#${u.rank}` : `${selectedCity.charAt(0).toUpperCase() + selectedCity.slice(1)} Dev`),
+            rankNum: u.countryRankAll || u.countryRank || u.rank || null,
             avatar: u.avatarUrl || u.avatar_url || `https://avatars.githubusercontent.com/u/${u.githubId}?v=4`,
             contributions: (u.totalContributions || 0) > 0 ? u.totalContributions : ((u.publicContributions || 0) + (u.privateContributions || 0)),
             publicContribs: u.publicContributions || u.totalContributions || 0,
@@ -376,7 +378,7 @@ export default function ProfileHub() {
       const privateC = u.privateContributions || 0;
       const totalC = (u.totalContributions || 0) > 0 ? u.totalContributions : (publicC + privateC);
       const primLang = u.topLanguages?.[0]?.name || 'TypeScript';
-      const officialRank = u.countryRankAll || u.countryRank || u.rank || (idx + 1);
+      const officialRank = u.countryRankAll || u.countryRank || null;
 
       return {
         username: u.username || u.login,
@@ -384,7 +386,7 @@ export default function ProfileHub() {
         role: u.bio ? u.bio.split(/[|•·]/)[0].trim() : 'Software Engineer',
         location: u.location || 'Pakistan',
         flag: '🇵🇰',
-        rank: `#${officialRank} Pakistan`,
+        rank: officialRank ? `#${officialRank} Pakistan` : 'Pakistan Contributor',
         rankNum: officialRank,
         avatar: u.avatarUrl || u.avatar_url || `https://avatars.githubusercontent.com/u/${u.githubId}?v=4`,
         contributions: totalC,
@@ -490,8 +492,8 @@ export default function ProfileHub() {
       role: 'Software Engineer',
       location: u.location || 'Global',
       flag: (u.location || '').toLowerCase().includes('pakistan') ? '🇵🇰' : '🌍',
-      rank: u.countryRankAll || u.countryRank ? `#${u.countryRankAll || u.countryRank}` : `#${idx + 1}`,
-      rankNum: u.countryRankAll || u.countryRank || (idx + 1),
+      rank: (u.countryRankAll || u.countryRank) ? `#${u.countryRankAll || u.countryRank}` : null,
+      rankNum: u.countryRankAll || u.countryRank || null,
       avatar: u.avatarUrl || u.avatar_url,
       contributions: u.totalContributions || u.totalCommits || 0,
       publicContribs: u.publicContributions || u.totalContributions || 0,
@@ -881,9 +883,11 @@ export default function ProfileHub() {
                       💻 #{featuredCommitsRank} PK (Commits)
                     </Badge>
                   )}
-                  <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/40 text-[11px] font-semibold py-0.5">
-                    📍 #1 in Abbottabad
-                  </Badge>
+                  {featuredProfile?.location && (
+                    <Badge className="bg-indigo-500/20 text-indigo-300 border-indigo-500/40 text-[11px] font-semibold py-0.5">
+                      📍 {featuredProfile.location}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs sm:text-sm text-slate-300">
                   {featuredProfile?.bio?.split(/[|•·]/)[0]?.trim() || 'Software Engineer'} • {featuredProfile?.location || 'Pakistan'} 🇵🇰

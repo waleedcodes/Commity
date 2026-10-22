@@ -105,3 +105,110 @@ const analyticsQuerySchema = Joi.object({
 // Leaderboard query schema
 const leaderboardQuerySchema = Joi.object({
   category: Joi.string().valid(
+    'commits', 'repositories', 'followers', 'contributions', 'public_contributions', 'private_contributions', 'streak'
+  ).default('contributions'),
+  period: Joi.string()
+    .valid(...Object.values(ANALYTICS_PERIODS), 'allTime', '1d', '7d', '30d', '90d', '365d')
+    .default(ANALYTICS_PERIODS.ALL_TIME),
+  timeframe: Joi.string().optional(),
+  search: Joi.string().trim().max(100).optional().allow(''),
+  location: Joi.string().trim().max(100).optional().allow(''),
+  language: Joi.string().trim().max(50).optional().allow(''),
+  page: Joi.number().integer().min(1).default(PAGINATION.DEFAULT_PAGE),
+  limit: Joi.number().integer().min(1).max(PAGINATION.MAX_LIMIT).default(PAGINATION.DEFAULT_LIMIT),
+  t: Joi.any().optional(),
+}).unknown(true);
+
+// Repository data schema
+const repositorySchema = Joi.object({
+  name: Joi.string().pattern(REGEX.GITHUB_REPO_NAME).required(),
+  fullName: Joi.string().required(),
+  description: Joi.string().max(500).optional().allow(null),
+  private: Joi.boolean().required(),
+  fork: Joi.boolean().required(),
+  homepage: Joi.string().uri().optional().allow('', null),
+  language: Joi.string().max(50).optional().allow(null),
+  stargazersCount: Joi.number().integer().min(0).required(),
+  forksCount: Joi.number().integer().min(0).required(),
+  watchersCount: Joi.number().integer().min(0).required(),
+  size: Joi.number().integer().min(0).required(),
+  defaultBranch: Joi.string().max(100).required(),
+  openIssuesCount: Joi.number().integer().min(0).required(),
+  topics: Joi.array().items(Joi.string().max(50)).max(20).optional(),
+  hasIssues: Joi.boolean().required(),
+  hasProjects: Joi.boolean().required(),
+  hasWiki: Joi.boolean().required(),
+  hasPages: Joi.boolean().required(),
+  hasDownloads: Joi.boolean().required(),
+  archived: Joi.boolean().required(),
+  disabled: Joi.boolean().required(),
+  pushedAt: Joi.date().iso().optional().allow(null),
+  createdAt: Joi.date().iso().required(),
+  updatedAt: Joi.date().iso().required(),
+});
+
+// Bulk user update schema
+const bulkUserUpdateSchema = Joi.object({
+  usernames: Joi.array()
+    .items(Joi.string().pattern(REGEX.GITHUB_USERNAME))
+    .min(1)
+    .max(100)
+    .unique()
+    .required(),
+  updateOptions: Joi.object({
+    forceUpdate: Joi.boolean().default(false),
+    includeRepos: Joi.boolean().default(true),
+    includeEvents: Joi.boolean().default(true),
+  }).optional(),
+});
+
+// Search query schema
+const searchQuerySchema = Joi.object({
+  q: Joi.string().trim().min(1).max(200).required(),
+  type: Joi.string().valid('users', 'repositories', 'code', 'commits').default('users'),
+  sort: Joi.string().valid('stars', 'forks', 'help-wanted-issues', 'updated').optional(),
+  order: Joi.string().valid('asc', 'desc').default('desc'),
+  page: Joi.number().integer().min(1).max(100).default(1),
+  per_page: Joi.number().integer().min(1).max(100).default(30),
+});
+
+// GitHub webhook schema
+const githubWebhookSchema = Joi.object({
+  action: Joi.string().required(),
+  repository: Joi.object().required(),
+  sender: Joi.object().required(),
+  // Add more specific webhook fields as needed
+}).unknown(true); // Allow unknown fields for flexibility
+
+/**
+ * Validate query parameters
+ */
+const validateQuery = (schema) => {
+  return (req, res, next) => {
+    if (req.query && req.query.timeframe && !req.query.period) {
+      req.query.period = req.query.timeframe === 'allTime' ? 'all_time' : req.query.timeframe;
+    }
+
+    const { error, value } = schema.validate(req.query, {
+      abortEarly: false,
+      allowUnknown: true,
+      stripUnknown: false,
+    });
+
+    if (error) {
+      const details = error.details.map(detail => ({
+        field: detail.path.join('.'),
+        message: detail.message,
+        value: detail.context.value,
+      }));
+
+      return next(ErrorFactory.badRequest('Query validation failed', { validationErrors: details }));
+    }
+
+    req.query = { ...req.query, ...value };
+    next();
+  };
+};
+
+/**
+ * Validate URL parameters

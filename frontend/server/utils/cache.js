@@ -135,3 +135,140 @@ class CacheManager {
    * @param {string} key - Cache key
    * @param {any} value - Value to cache
    * @param {number} ttl - Optional TTL in seconds
+   * @returns {boolean} Success status
+   */
+  static set(cacheType, key, value, ttl = null) {
+    try {
+      const cache = caches[cacheType];
+      if (!cache) {
+        logger.warn(`Cache type ${cacheType} not found`);
+        return false;
+      }
+      
+      const success = ttl ? cache.set(key, value, ttl) : cache.set(key, value);
+      
+      if (success) {
+        logger.debug(`Cache SET success: ${cacheType}:${key}`);
+      }
+      
+      return success;
+    } catch (error) {
+      logger.error(`Error setting cache ${cacheType}:${key}:`, error.message);
+      return false;
+    }
+  }
+  
+  /**
+   * Delete value from cache
+   * @param {string} cacheType - Type of cache (from CACHE_KEYS)
+   * @param {string} key - Cache key
+   * @returns {number} Number of deleted entries
+   */
+  static del(cacheType, key) {
+    try {
+      const cache = caches[cacheType];
+      if (!cache) {
+        logger.warn(`Cache type ${cacheType} not found`);
+        return 0;
+      }
+      
+      return cache.del(key);
+    } catch (error) {
+      logger.error(`Error deleting from cache ${cacheType}:${key}:`, error.message);
+      return 0;
+    }
+  }
+  
+  /**
+   * Check if key exists in cache
+   * @param {string} cacheType - Type of cache (from CACHE_KEYS)
+   * @param {string} key - Cache key
+   * @returns {boolean} True if key exists
+   */
+  static has(cacheType, key) {
+    try {
+      const cache = caches[cacheType];
+      if (!cache) {
+        return false;
+      }
+      
+      return cache.has(key);
+    } catch (error) {
+      logger.error(`Error checking cache ${cacheType}:${key}:`, error.message);
+      return false;
+    }
+  }
+  
+  /**
+   * Get cache statistics
+   * @param {string} cacheType - Type of cache (from CACHE_KEYS)
+   * @returns {object} Cache statistics
+   */
+  static getStats(cacheType) {
+    try {
+      const cache = caches[cacheType];
+      if (!cache) {
+        return null;
+      }
+      
+      return cache.getStats();
+    } catch (error) {
+      logger.error(`Error getting cache stats for ${cacheType}:`, error.message);
+      return null;
+    }
+  }
+  
+  /**
+   * Clear all entries from a specific cache
+   * @param {string} cacheType - Type of cache (from CACHE_KEYS)
+   * @returns {void}
+   */
+  static flush(cacheType) {
+    try {
+      const cache = caches[cacheType];
+      if (!cache) {
+        logger.warn(`Cache type ${cacheType} not found`);
+        return;
+      }
+      
+      cache.flushAll();
+      logger.info(`Cache flushed: ${cacheType}`);
+    } catch (error) {
+      logger.error(`Error flushing cache ${cacheType}:`, error.message);
+    }
+  }
+  
+  /**
+   * Clear all caches
+   * @returns {void}
+   */
+  static flushAll() {
+    try {
+      Object.keys(caches).forEach(cacheType => {
+        this.flush(cacheType);
+      });
+      logger.info('All caches flushed');
+    } catch (error) {
+      logger.error('Error flushing all caches:', error.message);
+    }
+  }
+  
+  /**
+   * Get cache keys
+   * @param {string} cacheType - Type of cache (from CACHE_KEYS)
+   * @returns {string[]} Array of cache keys
+   */
+  static keys(cacheType) {
+    try {
+      const cache = caches[cacheType];
+      if (!cache) {
+        return [];
+      }
+      
+      return cache.keys();
+    } catch (error) {
+      logger.error(`Error getting cache keys for ${cacheType}:`, error.message);
+      return [];
+    }
+  }
+  

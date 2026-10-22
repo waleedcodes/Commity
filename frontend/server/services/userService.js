@@ -198,3 +198,203 @@ class UserService {
       });
 
       // Calculate contribution metrics
+      const contributions = this._calculateContributions(filteredEvents);
+      const repositoryMetrics = this._calculateRepositoryMetrics(repositories, startDate, endDate);
+      const activityPatterns = this._calculateActivityPatterns(filteredEvents);
+      const collaborationMetrics = this._calculateCollaborationMetrics(filteredEvents, repositories);
+
+      const analyticsData = {
+        userId,
+        githubUsername: user.username,
+        username: user.username,
+        date: startDate,
+        period,
+        startDate,
+        endDate,
+        commits: contributions.commits || 0,
+        pullRequests: contributions.pullRequests || 0,
+        issues: contributions.issues || 0,
+        reviews: contributions.reviews || 0,
+        contributions,
+        repositories: repositoryMetrics,
+        languages: languages.map(lang => ({
+          name: lang.name,
+          bytes: lang.bytes,
+          percentage: lang.percentage,
+          commits: 0,
+        })),
+        activityPatterns,
+        collaboration: collaborationMetrics,
+        performance: {
+          averageCommitsPerDay: contributions.commits / Math.max(1, this._getDaysBetween(startDate, endDate)),
+          averagePRsPerWeek: contributions.pullRequests / Math.max(1, this._getWeeksBetween(startDate, endDate)),
+          averageIssuesPerMonth: contributions.issues / Math.max(1, this._getMonthsBetween(startDate, endDate)),
+        },
+        lastCalculatedAt: new Date(),
+      };
+
+      // Save or update analytics
+      if (existingAnalytics) {
+        Object.assign(existingAnalytics, analyticsData);
+        await existingAnalytics.save();
+        return existingAnalytics;
+      } else {
+        const analytics = new Analytics(analyticsData);
+        await analytics.save();
+        return analytics;
+      }
+
+    } catch (error) {
+      logger.error(`Error calculating analytics for user ${userId}:`, error.message);
+      throw ErrorFactory.internal(`Failed to calculate analytics: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get user leaderboard position for different categories
+   * @param {string} userId - User ID
+   * @returns {Promise<object>} Leaderboard positions
+   */
+  async getUserLeaderboardPositions(userId) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw ErrorFactory.notFound('User not found');
+      }
+
+      const categories = ['totalCommits', 'followers', 'publicRepos', 'totalContributions'];
+      const positions = {};
+
+      const total = await User.countDocuments({ isActive: true });
+      // NOTE: these ranks are within our indexed DB subset only — NOT global ranks.
+      // Minimum threshold to return any rank at all.
+      const MIN_USERS = 5;
+
+      for (const category of categories) {
+        if (total < MIN_USERS) {
+          positions[category] = {
+            rank: null,
+            total,
+            percentile: null,
+            value: user[category],
+            note: 'Not enough indexed users for meaningful ranking',
+          };
+          continue;
+        }
+
+        const rank = await User.countDocuments({
+          [category]: { $gt: user[category] },
+          isActive: true,
+        }) + 1;
+
+        const percentile = Math.round((1 - (rank - 1) / total) * 100);
+
+        positions[category] = {
+          rank,
+          total,
+          percentile,
+          value: user[category],
+          context: 'db_indexed_only',
+        };
+      }
+
+      return positions;
+    } catch (error) {
+      logger.error(`Error getting leaderboard positions for user ${userId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Update user's contribution streak
+   * @param {string} userId - User ID
+   * @returns {Promise<object>} Streak information
+   */
+  async updateContributionStreak(userId) {
+    try {
+      const user = await User.findById(userId);
+      if (!user) {
+        throw ErrorFactory.notFound('User not found');
+      }
+
+      const contributionCalendar = user.contributionCalendar || [];
+      if (contributionCalendar.length === 0) {
+        return { current: 0, longest: 0 };
+      }
+
+      // Sort calendar by date
+      const sortedCalendar = contributionCalendar.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      let currentStreak = 0;
+      let longestStreak = 0;
+      let tempStreak = 0;
+
+      // Calculate streaks
+      for (let i = sortedCalendar.length - 1; i >= 0; i--) {
+        const day = sortedCalendar[i];
+        
+        if (day.contributionCount > 0) {
+          tempStreak++;
+          if (i === sortedCalendar.length - 1) {
+            currentStreak = tempStreak;
+          }
+        } else {
+          if (tempStreak > longestStreak) {
+            longestStreak = tempStreak;
+          }
+          tempStreak = 0;
+          if (i === sortedCalendar.length - 1) {
+            currentStreak = 0;
+          }
+        }
+      }
+
+      // Final check for longest streak
+      if (tempStreak > longestStreak) {
+        longestStreak = tempStreak;
+      }
+
+      // Update user
+      user.contributionStreak = currentStreak;
+      user.longestStreak = longestStreak;
+      await user.save();
+
+      return {
+        current: currentStreak,
+        longest: longestStreak,
+      };
+    } catch (error) {
+      logger.error(`Error updating contribution streak for user ${userId}:`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if user data was recently updated (Weekly snapshot cadence: 7 days)
+   */
+  isRecentlyUpdated(user) {
+    const syncDays = parseInt(process.env.USER_SYNC_INTERVAL_DAYS, 10) || 7;
+    const threshold = syncDays * 24 * 60 * 60 * 1000;
+    return user.lastFetchedAt && (Date.now() - user.lastFetchedAt.getTime()) < threshold;
+  }
+
+  /**
+   * Check if user data was recently updated (private method for backward compatibility)
+   * @private
+   */
+  _isRecentlyUpdated(user) {
+    return this.isRecentlyUpdated(user);
+  }
+
+  /**
+   * Synchronize single user profile with live GitHub data
+   * @param {string} username - GitHub username
+   * @param {boolean} force - Force refresh even if within 7-day snapshot window
+   * @returns {Promise<User>}
+   */
+  async syncUserProfile(username, force = false) {
+    const existingUser = await User.findByUsername(username);
+    if (existingUser && !force && this.isRecentlyUpdated(existingUser)) {
+      logger.info(`Serving smooth database snapshot for @${username} (last synced ${Math.round((Date.now() - existingUser.lastFetchedAt.getTime()) / (1000 * 60 * 60 * 24))}d ago)`);
+      return existingUser;
+    }

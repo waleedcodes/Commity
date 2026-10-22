@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] route.js
 import { handleRequest } from '@/server/adapter';
 const WrappedController = require('@/server/controllers/wrappedController');
 

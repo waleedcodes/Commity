@@ -48,3 +48,28 @@ const logger = {
         resetTime: rateLimit?.reset ? new Date(rateLimit.reset * 1000).toISOString() : null,
       },
     };
+    if (error) {
+      logData.error = error.message;
+      logger.error(`GitHub API Error: ${JSON.stringify(logData)}`);
+    } else {
+      logger.info(`GitHub API Call: ${JSON.stringify(logData)}`);
+    }
+  },
+
+  logDatabaseOperation: (operation, collection, duration, error = null) => {
+    const logData = { operation, collection, duration: `${duration}ms` };
+    if (error) {
+      logData.error = error.message;
+      logger.error(`Database Error: ${JSON.stringify(logData)}`);
+    } else {
+      logger.debug(`Database Operation: ${JSON.stringify(logData)}`);
+    }
+  },
+
+  logUserActivity: (userId, action, metadata = {}) => {
+    const logData = { userId, action, metadata };
+    logger.info(`User Activity: ${JSON.stringify(logData)}`);
+  },
+};
+
+module.exports = logger;

@@ -1,0 +1,12 @@
+name: Weekly Contributor Snapshot Sync
+
+on:
+  schedule:
+    # Runs every Monday at 02:00 UTC (matching committers.top weekly snapshot release)
+    - cron: '0 2 * * 1'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+jobs:
+  weekly-sync:
+    name: Sync Regional Rankings & Contributor Stats
+    runs-on: ubuntu-latest

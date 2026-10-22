@@ -44,3 +44,49 @@ app.use('/api/', limiter);
 // CORS configuration
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true,
+}));
+
+const mongoose = require('mongoose');
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development',
+  });
+});
+
+// API routes
+app.use('/api/users', userRoutes);
+app.use('/api/leaderboard', leaderboardRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.get('/api/platform/stats', require('./controllers/analyticsController').getPlatformStats);
+
+// Handle 404 routes
+app.use('*', notFound);
+
+// Global error handling middleware
+app.use(errorHandler);
+
+let server = null;
+
+// Graceful shutdown helper
+const shutdown = async (signal) => {
+  logger.info(`${signal} signal received: closing HTTP server and database connections`);
+  if (server) {
+    server.close(async () => {
+      logger.info('HTTP server closed');
+      try {
+        await mongoose.connection.close();
+        logger.info('MongoDB connection closed');
+      } catch (err) {
+        logger.error('Error closing MongoDB connection:', err);
+      }
+      process.exit(0);

@@ -1,3 +1,4 @@
+// [Commity Phase 1 Scaffolding] page.js
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';

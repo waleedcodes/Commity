@@ -321,3 +321,165 @@ analyticsSchema.virtual('contributionDiversity').get(function() {
   const total = contributions.total || 1;
   
   const distribution = [
+    contributions.commits / total,
+    contributions.pullRequests / total,
+    contributions.issues / total,
+    contributions.reviews / total,
+  ].filter(val => val > 0);
+  
+  // Calculate Shannon diversity index
+  const diversity = -distribution.reduce((sum, p) => sum + (p * Math.log(p)), 0);
+  return Math.round(diversity * 100) / 100;
+});
+
+// Static methods
+analyticsSchema.statics.getAnalyticsByPeriod = function(userId, period, startDate, endDate) {
+  const query = { userId, period };
+  
+  if (startDate && endDate) {
+    query.startDate = { $gte: new Date(startDate) };
+    query.endDate = { $lte: new Date(endDate) };
+  }
+  
+  return this.find(query).sort({ startDate: -1 });
+};
+
+analyticsSchema.statics.getTopPerformers = function(period = '30d', metric = 'contributions.total', limit = 10) {
+  return this.aggregate([
+    { $match: { period } },
+    { $sort: { [metric]: -1, startDate: -1 } },
+    { $group: {
+      _id: '$userId',
+      username: { $first: '$githubUsername' },
+      bestPerformance: { $first: `$${metric}` },
+      latestData: { $first: '$$ROOT' }
+    }},
+    { $sort: { bestPerformance: -1 } },
+    { $limit: limit },
+    { $lookup: {
+      from: 'users',
+      localField: '_id',
+      foreignField: '_id',
+      as: 'user'
+    }},
+    { $unwind: '$user' },
+    { $project: {
+      username: 1,
+      bestPerformance: 1,
+      'user.name': 1,
+      'user.avatarUrl': 1,
+      'user.location': 1,
+      latestData: 1
+    }}
+  ]);
+};
+
+analyticsSchema.statics.calculateTrends = function(userId, metric = 'contributions.total', periods = 6) {
+  return this.aggregate([
+    { $match: { 
+      userId: new mongoose.Types.ObjectId(userId),
+      period: '30d'
+    }},
+    { $sort: { startDate: -1 } },
+    { $limit: periods },
+    { $project: {
+      period: '$startDate',
+      value: `$${metric}`,
+      _id: 0
+    }},
+    { $sort: { period: 1 } }
+  ]);
+};
+
+// Instance methods
+analyticsSchema.methods.calculatePerformanceScore = function() {
+  const maxValues = {
+    commits: 100,
+    pullRequests: 20,
+    issues: 30,
+    reviews: 25,
+  };
+  
+  let score = 0;
+  let maxScore = 0;
+  
+  Object.entries(maxValues).forEach(([key, max]) => {
+    const value = this.contributions[key] || 0;
+    score += Math.min(value / max, 1) * 25; // Each category worth 25 points
+    maxScore += 25;
+  });
+  
+  this.performance.productivityScore = Math.round((score / maxScore) * 100);
+  return this.performance.productivityScore;
+};
+
+analyticsSchema.methods.updateAverages = function() {
+  const start = this.startDate || this.date || new Date();
+  const end = this.endDate || this.date || new Date();
+  const daysInPeriod = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+  const weeksInPeriod = Math.max(1, Math.ceil(daysInPeriod / 7));
+  const monthsInPeriod = Math.max(1, Math.ceil(daysInPeriod / 30));
+  
+  const commits = this.commits || this.contributions?.commits || 0;
+  const prs = this.pullRequests || this.contributions?.pullRequests || 0;
+  const issues = this.issues || this.contributions?.issues || 0;
+
+  if (!this.performance) this.performance = {};
+  this.performance.averageCommitsPerDay = commits / daysInPeriod;
+  this.performance.averagePRsPerWeek = prs / weeksInPeriod;
+  this.performance.averageIssuesPerMonth = issues / monthsInPeriod;
+  
+  return this.performance;
+};
+
+// Pre-save middleware
+analyticsSchema.pre('save', function(next) {
+  // Synchronize usernames
+  if (!this.githubUsername && this.username) {
+    this.githubUsername = this.username;
+  }
+  if (!this.username && this.githubUsername) {
+    this.username = this.githubUsername;
+  }
+
+  // Synchronize dates
+  if (this.date && !this.startDate) {
+    this.startDate = this.date;
+  }
+  if (this.date && !this.endDate) {
+    this.endDate = this.date;
+  }
+  if (this.startDate && !this.date) {
+    this.date = this.startDate;
+  }
+
+  // Synchronize metrics
+  if (!this.contributions) {
+    this.contributions = {};
+  }
+  
+  if (this.commits && !this.contributions.commits) this.contributions.commits = this.commits;
+  if (this.pullRequests && !this.contributions.pullRequests) this.contributions.pullRequests = this.pullRequests;
+  if (this.issues && !this.contributions.issues) this.contributions.issues = this.issues;
+  if (this.reviews && !this.contributions.reviews) this.contributions.reviews = this.reviews;
+
+  this.commits = this.contributions.commits || 0;
+  this.pullRequests = this.contributions.pullRequests || 0;
+  this.issues = this.contributions.issues || 0;
+  this.reviews = this.contributions.reviews || 0;
+
+  // Calculate total contributions
+  this.contributions.total = 
+    this.commits + 
+    this.pullRequests + 
+    this.issues + 
+    this.reviews;
+  
+  // Update performance metrics
+  this.calculatePerformanceScore();
+  this.updateAverages();
+  
+  next();
+});
+
+module.exports = mongoose.models.Analytics || mongoose.model('Analytics', analyticsSchema);

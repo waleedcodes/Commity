@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] committersService.js
 const https = require('https');
 const User = require('../models/User');
 const logger = require('../utils/logger');

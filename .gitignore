@@ -11,3 +11,16 @@ backend/node_modules/
 frontend/.next/
 frontend/out/
 
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+backend/logs/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local

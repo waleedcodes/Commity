@@ -1,3 +1,4 @@
+// [Commity Phase 1 Scaffolding] User.js
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({

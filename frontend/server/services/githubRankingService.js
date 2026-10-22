@@ -159,3 +159,84 @@ class GitHubRankingService {
           {
             $set: {
               name: cand.name,
+              avatarUrl: cand.avatarUrl,
+              htmlUrl: cand.htmlUrl,
+              location: cand.location || region,
+              followers: cand.followers,
+              following: cand.following,
+              publicRepos: cand.publicRepos,
+              totalContributions: cand.totalContributions,
+              publicContributions: cand.publicContributions,
+              privateContributions: cand.privateContributions,
+              totalCommits: cand.totalCommits,
+              totalPullRequests: cand.totalPullRequests,
+              totalIssues: cand.totalIssues,
+              totalReviews: cand.totalReviews,
+              contributionStreak: cand.contributionStreak,
+              longestStreak: cand.longestStreak,
+              topLanguages: cand.topLanguages,
+              countryRank: cand.rank,
+              accountType: 'User',
+              contributionSource: 'github_graphql',
+              dataQuality: 'verified',
+              statsUpdatedAt: new Date(),
+              lastFetchedAt: new Date(),
+              isActive: true,
+            },
+            $setOnInsert: {
+              githubId: cand.githubId || (Date.now() + Math.floor(Math.random() * 100000)),
+              githubCreatedAt: new Date('2020-01-01'),
+              githubUpdatedAt: new Date(),
+            }
+          },
+          { upsert: true, new: true }
+        );
+        upsertedCount++;
+      } catch (upsertErr) {
+        logger.warn(`Notice updating candidate @${cand.username}: ${upsertErr.message}`);
+      }
+    }
+
+    // 6. Save immutable RankingSnapshot
+    const snapshotRankings = rankedCandidates.map(c => ({
+      rank: c.rank,
+      username: c.username,
+      name: c.name,
+      avatarUrl: c.avatarUrl,
+      location: c.location || region,
+      totalContributions: c.totalContributions,
+      publicContributions: c.publicContributions,
+      privateContributions: c.privateContributions,
+      totalCommits: c.totalCommits,
+      totalPullRequests: c.totalPullRequests,
+      totalIssues: c.totalIssues,
+      totalReviews: c.totalReviews,
+      followers: c.followers,
+      primaryLanguage: c.primaryLanguage,
+      dataQuality: 'verified',
+    }));
+
+    const snapshot = new RankingSnapshot({
+      region,
+      regionKey,
+      period: 'weekly',
+      generatedAt: new Date(),
+      totalUsersFound,
+      minimumFollowers,
+      candidatesConsidered: candidatePool.length,
+      usersRanked: snapshotRankings.length,
+      cadence: '7-Day Weekly Snapshots',
+      dataSource: 'GitHub GraphQL API (Direct Verified)',
+      rankings: snapshotRankings,
+    });
+
+    await snapshot.save();
+
+    const durationSec = Math.round((Date.now() - startTime) / 1000);
+    logger.info(`✅ [GitHubRankingService] Successfully generated snapshot for '${region}' in ${durationSec}s: Ranked ${snapshotRankings.length} developers, Min followers: ${minimumFollowers}`);
+
+    return snapshot;
+  }
+}
+
+module.exports = new GitHubRankingService();

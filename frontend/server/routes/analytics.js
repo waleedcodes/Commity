@@ -34,3 +34,40 @@ router.get('/global',
   validateDateRange,
   optionalAuth,
   AnalyticsController.getGlobalAnalytics
+);
+
+/**
+ * @route   GET /api/analytics/summary
+ * @desc    Get analytics summary
+ * @access  Public
+ */
+router.get('/summary',
+  AnalyticsController.getAnalyticsSummary
+);
+
+/**
+ * @route   GET /api/analytics/platform/stats
+ * @route   GET /api/platform/stats
+ * @desc    Get live platform statistics
+ * @access  Public
+ */
+router.get('/platform/stats',
+  AnalyticsController.getPlatformStats
+);
+
+/**
+ * @route   GET /api/analytics/insights
+ * @desc    Get platform insights and comprehensive analytics
+ * @access  Public
+ */
+router.get('/insights',
+  validateQueryParams,
+  AnalyticsController.getPlatformInsights
+);
+
+/**
+ * @route   GET /api/analytics/trends
+ * @desc    Get analytics trends and patterns
+ * @access  Public
+ */
+router.get('/trends',

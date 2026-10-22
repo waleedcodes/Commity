@@ -1,0 +1,497 @@
+const moment = require('moment');
+const { REGEX, TIME } = require('../config/constants');
+
+/**
+ * Helper utility functions for the GitHub Analytics Tool
+ */
+
+class Helpers {
+  
+  /**
+   * Validate GitHub username format
+   * @param {string} username - GitHub username to validate
+   * @returns {boolean} True if valid
+   */
+  static isValidGitHubUsername(username) {
+    if (!username || typeof username !== 'string') {
+      return false;
+    }
+    
+    return REGEX.GITHUB_USERNAME.test(username) && username.length <= 39;
+  }
+  
+  /**
+   * Validate GitHub repository name format
+   * @param {string} repoName - Repository name to validate
+   * @returns {boolean} True if valid
+   */
+  static isValidRepoName(repoName) {
+    if (!repoName || typeof repoName !== 'string') {
+      return false;
+    }
+    
+    return REGEX.GITHUB_REPO_NAME.test(repoName) && repoName.length <= 100;
+  }
+  
+  /**
+   * Validate email format
+   * @param {string} email - Email to validate
+   * @returns {boolean} True if valid
+   */
+  static isValidEmail(email) {
+    if (!email || typeof email !== 'string') {
+      return false;
+    }
+    
+    return REGEX.EMAIL.test(email);
+  }
+  
+  /**
+   * Sanitize user input by removing potentially harmful characters
+   * @param {string} input - Input string to sanitize
+   * @returns {string} Sanitized string
+   */
+  static sanitizeInput(input) {
+    if (!input || typeof input !== 'string') {
+      return '';
+    }
+    
+    return input
+      .trim()
+      .replace(/[<>"'%;()&+]/g, '') // Remove potentially harmful characters
+      .replace(/\s+/g, ' '); // Replace multiple spaces with single space
+  }
+  
+  /**
+   * Generate a random string of specified length
+   * @param {number} length - Length of the string
+   * @param {string} charset - Character set to use
+   * @returns {string} Random string
+   */
+  static generateRandomString(length = 16, charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789') {
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return result;
+  }
+  
+  /**
+   * Format large numbers with appropriate suffixes (K, M, B)
+   * @param {number} num - Number to format
+   * @param {number} precision - Decimal places
+   * @returns {string} Formatted number string
+   */
+  static formatNumber(num, precision = 1) {
+    if (num === null || num === undefined || isNaN(num)) {
+      return '0';
+    }
+    
+    const absNum = Math.abs(num);
+    
+    if (absNum >= 1e9) {
+      return (num / 1e9).toFixed(precision) + 'B';
+    } else if (absNum >= 1e6) {
+      return (num / 1e6).toFixed(precision) + 'M';
+    } else if (absNum >= 1e3) {
+      return (num / 1e3).toFixed(precision) + 'K';
+    }
+    
+    return num.toString();
+  }
+  
+  /**
+   * Calculate percentage with precision
+   * @param {number} value - Current value
+   * @param {number} total - Total value
+   * @param {number} precision - Decimal places
+   * @returns {number} Percentage
+   */
+  static calculatePercentage(value, total, precision = 2) {
+    if (!total || total === 0) {
+      return 0;
+    }
+    
+    return parseFloat(((value / total) * 100).toFixed(precision));
+  }
+  
+  /**
+   * Get date range for different periods
+   * @param {string} period - Period type (daily, weekly, monthly, yearly)
+   * @param {Date} endDate - End date (default: now)
+   * @returns {object} Object with startDate and endDate
+   */
+  static getDateRange(period, endDate = new Date()) {
+    const end = moment(endDate);
+    let start;
+    
+    // Handle different period formats
+    const periodLower = (period || '30d').toLowerCase();
+    
+    // Handle numeric periods like '7d', '30d', '90d', '365d'
+    const dayMatch = periodLower.match(/^(\d+)d$/);
+    if (dayMatch) {
+      const days = parseInt(dayMatch[1]);
+      start = moment(end).subtract(days, 'days');
+    } else {
+      switch (periodLower) {
+        case 'daily':
+        case '1d':
+          start = moment(end).subtract(1, 'day');
+          break;
+        case 'weekly':
+        case '7d':
+          start = moment(end).subtract(7, 'days');
+          break;
+        case 'monthly':
+        case '30d':
+          start = moment(end).subtract(30, 'days');
+          break;
+        case 'quarterly':
+        case '90d':
+          start = moment(end).subtract(90, 'days');
+          break;
+        case 'yearly':
+        case '365d':
+          start = moment(end).subtract(365, 'days');
+          break;
+        case 'all_time':
+          start = moment('2008-01-01'); // GitHub founded in 2008
+          break;
+        default:
+          start = moment(end).subtract(30, 'days');
+      }
+    }
+    
+    return {
+      start: start.toDate(),
+      end: end.toDate(),
+      startDate: start.toDate(),
+      endDate: end.toDate(),
+    };
+  }
+  
+  /**
+   * Format date for display
+   * @param {Date|string} date - Date to format
+   * @param {string} format - Moment.js format string
+   * @returns {string} Formatted date string
+   */
+  static formatDate(date, format = 'YYYY-MM-DD HH:mm:ss') {
+    return moment(date).format(format);
+  }
+  
+  /**
+   * Calculate time ago from date
+   * @param {Date|string} date - Date to calculate from
+   * @returns {string} Human-readable time ago string
+   */
+  static timeAgo(date) {
+    return moment(date).fromNow();
+  }
+  
+  /**
+   * Deep clone an object
+   * @param {any} obj - Object to clone
+   * @returns {any} Cloned object
+   */
+  static deepClone(obj) {
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
+    }
+    
+    if (obj instanceof Date) {
+      return new Date(obj.getTime());
+    }
+    
+    if (obj instanceof Array) {
+      return obj.map(item => this.deepClone(item));
+    }
+    
+    if (typeof obj === 'object') {
+      const cloned = {};
+      Object.keys(obj).forEach(key => {
+        cloned[key] = this.deepClone(obj[key]);
+      });
+      return cloned;
+    }
+    
+    return obj;
+  }
+  
+  /**
+   * Debounce function execution
+   * @param {Function} func - Function to debounce
+   * @param {number} wait - Wait time in milliseconds
+   * @returns {Function} Debounced function
+   */
+  static debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+  
+  /**
+   * Throttle function execution
+   * @param {Function} func - Function to throttle
+   * @param {number} limit - Time limit in milliseconds
+   * @returns {Function} Throttled function
+   */
+  static throttle(func, limit) {
+    let inThrottle;
+    return function executedFunction(...args) {
+      if (!inThrottle) {
+        func.apply(this, args);
+        inThrottle = true;
+        setTimeout(() => inThrottle = false, limit);
+      }
+    };
+  }
+  
+  /**
+   * Retry function execution with exponential backoff
+   * @param {Function} fn - Function to retry
+   * @param {number} maxRetries - Maximum number of retries
+   * @param {number} baseDelay - Base delay in milliseconds
+   * @returns {Promise} Promise that resolves with function result
+   */
+  static async retryWithBackoff(fn, maxRetries = 3, baseDelay = 1000) {
+    let lastError;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        const delay = baseDelay * Math.pow(2, attempt);
+        await this.sleep(delay);
+      }
+    }
+    
+    throw lastError;
+  }
+  
+  /**
+   * Sleep for specified milliseconds
+   * @param {number} ms - Milliseconds to sleep
+   * @returns {Promise} Promise that resolves after sleep
+   */
+  static sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  /**
+   * Check if value is empty (null, undefined, empty string, empty array, empty object)
+   * @param {any} value - Value to check
+   * @returns {boolean} True if empty
+   */
+  static isEmpty(value) {
+    if (value === null || value === undefined) {
+      return true;
+    }
+    
+    if (typeof value === 'string') {
+      return value.trim().length === 0;
+    }
+    
+    if (Array.isArray(value)) {
+      return value.length === 0;
+    }
+    
+    if (typeof value === 'object') {
+      return Object.keys(value).length === 0;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Generate pagination metadata
+   * @param {number} page - Current page
+   * @param {number} limit - Items per page
+   * @param {number} totalItems - Total number of items
+   * @returns {object} Pagination metadata
+   */
+  static generatePaginationMeta(page, limit, totalItems) {
+    const totalPages = Math.ceil(totalItems / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+    
+    return {
+      currentPage: page,
+      totalPages,
+      totalItems,
+      itemsPerPage: limit,
+      hasNextPage,
+      hasPrevPage,
+      nextPage: hasNextPage ? page + 1 : null,
+      prevPage: hasPrevPage ? page - 1 : null,
+    };
+  }
+  
+  /**
+   * Convert camelCase to snake_case
+   * @param {string} str - String to convert
+   * @returns {string} snake_case string
+   */
+  static camelToSnake(str) {
+    return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+  }
+  
+  /**
+   * Convert snake_case to camelCase
+   * @param {string} str - String to convert
+   * @returns {string} camelCase string
+   */
+  static snakeToCamel(str) {
+    return str.replace(/_([a-z])/g, (match, letter) => letter.toUpperCase());
+  }
+  
+  /**
+   * Calculate contribution score based on different factors
+   * @param {object} contributions - Contribution data
+   * @returns {number} Calculated score
+   */
+  static calculateContributionScore(contributions) {
+    const weights = {
+      commits: 1,
+      pullRequests: 3,
+      issues: 2,
+      reviews: 2,
+      releases: 5,
+    };
+    
+    let score = 0;
+    Object.entries(contributions).forEach(([type, count]) => {
+      if (weights[type]) {
+        score += count * weights[type];
+      }
+    });
+    
+    return score;
+  }
+  
+  /**
+   * Generate color based on string hash
+   * @param {string} str - String to generate color from
+   * @returns {string} Hex color code
+   */
+  static generateColorFromString(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    const color = (hash & 0x00FFFFFF).toString(16).toUpperCase();
+    return '#' + '00000'.substring(0, 6 - color.length) + color;
+  }
+  
+  /**
+   * Chunk array into smaller arrays
+   * @param {Array} array - Array to chunk
+   * @param {number} size - Chunk size
+   * @returns {Array} Array of chunks
+   */
+  /**
+   * Calculate median of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateMedian(values) {
+    if (!values || values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+  }
+
+  /**
+   * Calculate standard deviation of a numbers array
+   * @param {number[]} values
+   * @returns {number}
+   */
+  static calculateStandardDeviation(values) {
+    if (!values || values.length === 0) return 0;
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const squareDiffs = values.map(val => Math.pow(val - mean, 2));
+    const avgSquareDiff = squareDiffs.reduce((a, b) => a + b, 0) / values.length;
+    return Math.sqrt(avgSquareDiff);
+  }
+
+  /**
+   * Normalize country name from freeform location string
+   * @param {string} location
+   * @returns {string|null}
+   */
+  static normalizeCountry(location) {
+    if (!location || typeof location !== 'string') return null;
+    const clean = location.trim();
+    if (!clean || /^(undefined|null|none|n\/a|\?|-)$/i.test(clean)) return null;
+
+    const lower = clean.toLowerCase();
+
+    // Known country keywords / aliases & major tech hubs
+    if (/\b(pakistan|pk)\b/i.test(lower) || /\b(karachi|lahore|islamabad|rawalpindi|abbottabad|faisalabad|multan|peshawar|quetta|sialkot|gujranwala)\b/i.test(lower)) {
+      return 'Pakistan';
+    }
+    if (/\b(united states|usa|u\.s\.a|u\.s\.|us)\b/i.test(lower) || /\b(california|new york|san francisco|seattle|austin|chicago|boston|los angeles|texas|washington|silicon valley)\b/i.test(lower)) {
+      return 'United States';
+    }
+    if (/\b(india|in)\b/i.test(lower) || /\b(bangalore|bengaluru|delhi|mumbai|pune|hyderabad|chennai|noida|gurgaon)\b/i.test(lower)) {
+      return 'India';
+    }
+    if (/\b(united kingdom|uk|u\.k\.|england|scotland|wales|london)\b/i.test(lower)) {
+      return 'United Kingdom';
+    }
+    if (/\b(germany|deutschland|berlin|munich|hamburg)\b/i.test(lower)) {
+      return 'Germany';
+    }
+    if (/\b(canada|toronto|vancouver|montreal|ontario|quebec)\b/i.test(lower)) {
+      return 'Canada';
+    }
+    if (/\b(france|paris)\b/i.test(lower)) {
+      return 'France';
+    }
+    if (/\b(japan|tokyo)\b/i.test(lower)) {
+      return 'Japan';
+    }
+    if (/\b(china|beijing|shanghai|shenzhen|hangzhou)\b/i.test(lower)) {
+      return 'China';
+    }
+    if (/\b(australia|sydney|melbourne|brisbane)\b/i.test(lower)) {
+      return 'Australia';
+    }
+    if (/\b(brazil|brasil|sao paulo|rio de janeiro)\b/i.test(lower)) {
+      return 'Brazil';
+    }
+    if (/\b(netherlands|amsterdam|rotterdam)\b/i.test(lower)) {
+      return 'Netherlands';
+    }
+    if (/\b(singapore)\b/i.test(lower)) {
+      return 'Singapore';
+    }
+
+    // Fallback: If formatted as "City, Country", take the last segment
+    if (clean.includes(',')) {
+      const parts = clean.split(',');
+      const candidate = parts[parts.length - 1].trim();
+      if (candidate && candidate.length > 1 && !/^(undefined|null)$/i.test(candidate)) {
+        return candidate.replace(/\b\w/g, c => c.toUpperCase());
+      }
+    }
+
+    return clean.replace(/\b\w/g, c => c.toUpperCase());
+  }
+}
+
+module.exports = Helpers;

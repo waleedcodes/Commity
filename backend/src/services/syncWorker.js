@@ -88,13 +88,12 @@ class SyncWorker {
       const durationSec = Math.round((Date.now() - startTime) / 1000);
       logger.info(`✅ SyncWorker cycle finished in ${durationSec}s: ${updatedCount} updated, ${errorCount} errors`);
 
-      // Generate authentic regional snapshot for Pakistan using direct GitHub GraphQL
+      // Synchronize authoritative committers.top rankings for Pakistan
       try {
-        const GitHubRankingService = require('./githubRankingService');
-        await GitHubRankingService.generateRegionalRanking('Pakistan', { candidateLimit: 30, topQuota: 256 });
-        await User.recalculateRegionalRanks('pakistan');
+        const CommittersService = require('./committersService');
+        await CommittersService.syncRegion('Pakistan');
       } catch (rankingErr) {
-        logger.warn(`Regional ranking generation warning: ${rankingErr.message}`);
+        logger.warn(`Committers.top sync warning: ${rankingErr.message}`);
       }
 
       // Run automated geographic discovery for active developers across key regions

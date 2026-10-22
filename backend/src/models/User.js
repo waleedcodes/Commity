@@ -341,67 +341,28 @@ userSchema.statics.getLeaderboard = function(category = 'totalCommits', limit = 
 };
 
 userSchema.statics.recalculateRegionalRanks = async function(region = 'pakistan') {
-  const users = await this.find({
-    location: { $regex: region, $options: 'i' },
-    isActive: true,
-    accountType: { $ne: 'Organization' },
-  }).sort({ totalContributions: -1, followers: -1 });
-
-  let updatedCount = 0;
-  for (let i = 0; i < users.length; i++) {
-    const rank = i + 1;
-    // Only update countryRank for users who DON'T have official committers.top data.
-    // Users with countryRankAll have authoritative rankings from syncRegion().
-    if (!users[i].countryRankAll && users[i].countryRank !== rank) {
-      users[i].countryRank = rank;
-      await users[i].save();
-      updatedCount++;
-    }
+  // Authoritative ranking is strictly sourced from CommittersService (committers.top).
+  // We NEVER fabricate sequential 1..N ranks from MongoDB subsets.
+  try {
+    const CommittersService = require('../services/committersService');
+    const result = await CommittersService.syncRegion(region);
+    return result?.usersUpdated || 0;
+  } catch (err) {
+    return 0;
   }
-  return updatedCount;
 };
 
 // Instance methods
 userSchema.methods.updateRank = async function(category = 'totalContributions') {
-  const sortVal = this[category] || 0;
-
-  // NOTE: We do NOT compute globalRank here.
-  // Counting "users in our DB with more contributions" is NOT a real global rank —
-  // it's just a rank within our small indexed subset (e.g., 60 users).
-  // globalRank is only meaningful when sourced from a real external dataset
-  // (e.g., committers.top worldwide ranking if/when available).
-  // Showing a fake #3 out of 60 is worse than showing nothing.
-
-  // countryRank logic:
+  // Authoritative ranking logic:
   // - countryRankAll, countryRankPublic, countryRankCommits are set EXCLUSIVELY
-  //   by CommittersService.syncRegion() from the official committers.top data.
-  //   We NEVER overwrite those values here.
+  //   from committers.top official data.
   // - countryRank (the primary display rank) mirrors countryRankAll when available.
+  // - We DO NOT calculate fake ranks by counting a few rows in MongoDB.
   if (this.countryRankAll) {
     this.countryRank = this.countryRankAll;
-  } else if (this.location && !this.countryRank) {
-    // Fallback: compute a rough country rank from the DB, but only if
-    // there are enough regional users for a meaningful calculation.
-    const MIN_REGIONAL_USERS = 5;
-    const locParts = this.location.split(',').map(s => s.trim());
-    const regionName = locParts[locParts.length - 1] || this.location;
-
-    const regionalUserCount = await this.constructor.countDocuments({
-      location: { $regex: regionName, $options: 'i' },
-      isActive: true,
-      accountType: { $ne: 'Organization' },
-    });
-
-    if (regionalUserCount >= MIN_REGIONAL_USERS) {
-      const regionalHigherCount = await this.constructor.countDocuments({
-        [category]: { $gt: sortVal },
-        location: { $regex: regionName, $options: 'i' },
-        isActive: true,
-        accountType: { $ne: 'Organization' },
-      });
-      this.countryRank = regionalHigherCount + 1;
-    }
-    // If not enough regional users, leave countryRank as-is
+  } else {
+    this.countryRank = null;
   }
 
   await this.save();
@@ -414,8 +375,9 @@ userSchema.methods.toPublicJSON = function() {
   // Provide compatibility aliases
   obj.login = obj.username;
   obj.currentStreak = obj.contributionStreak || 0;
-  obj.countryRank = this.countryRank || this.countryRankAll || null;
-  obj.countryRankAll = this.countryRankAll || this.countryRank || null;
+  const officialRank = this.countryRankAll || this.countryRank || null;
+  obj.countryRank = officialRank;
+  obj.countryRankAll = officialRank;
   obj.countryRankPublic = this.countryRankPublic || null;
   obj.countryRankCommits = this.countryRankCommits || null;
   

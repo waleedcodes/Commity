@@ -44,3 +44,49 @@ export async function handleRequest(handler, request, context = {}) {
       }
     } catch {
       body = {};
+    }
+  }
+
+  let statusCode = 200;
+  const headers = new Headers();
+
+  const req = {
+    method: request.method,
+    url: request.url,
+    originalUrl: url.pathname + url.search,
+    path: url.pathname,
+    query,
+    params,
+    body,
+    headers: Object.fromEntries(request.headers.entries()),
+    ip: request.headers.get('x-forwarded-for') || '127.0.0.1',
+    get(headerName) {
+      return request.headers.get(headerName);
+    },
+  };
+
+  const res = {
+    status(code) {
+      statusCode = code;
+      return res;
+    },
+    setHeader(name, value) {
+      headers.set(name, value);
+      return res;
+    },
+    header(name, value) {
+      headers.set(name, value);
+      return res;
+    },
+  };
+
+  return new Promise((resolve) => {
+    let resolved = false;
+
+    const safeResolve = (response) => {
+      if (!resolved) {
+        resolved = true;
+        resolve(response);
+      }
+    };
+

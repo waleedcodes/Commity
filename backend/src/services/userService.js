@@ -1,8 +1,9 @@
-// [Commity Phase 1 Scaffolding] userService.js
+// [Commity Phase 2 Logic] userService.js
 const User = require('../models/User');
 const Analytics = require('../models/Analytics');
 const logger = require('../utils/logger');
 const Helpers = require('../utils/helpers');
+const CommittersService = require('./committersService');
 const { ErrorFactory } = require('../middleware/errorHandler');
 
 class UserService {
@@ -14,6 +15,24 @@ class UserService {
    */
   async createOrUpdateUser(userData) {
     try {
+      // Auto-enrich with authoritative committers.top ranks if location is detected
+      if (userData.username && userData.location && !userData.countryRankAll) {
+        try {
+          const countryName = Helpers.normalizeCountry(userData.location);
+          if (countryName) {
+            const official = await CommittersService.getUserRanks(userData.username, countryName);
+            if (official && official.isRanked) {
+              userData.countryRankAll = official.countryRankAll;
+              userData.countryRankPublic = official.countryRankPublic;
+              userData.countryRankCommits = official.countryRankCommits;
+              userData.countryRank = official.countryRank;
+            }
+          }
+        } catch (e) {
+          // ignore rank lookup error and proceed
+        }
+      }
+
       const existingUser = await User.findOne({ 
         $or: [
           { githubId: userData.githubId },

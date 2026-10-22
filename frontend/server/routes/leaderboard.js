@@ -43,3 +43,48 @@ router.get('/featured',
 /**
  * @route   GET /api/leaderboard/regions
  * @desc    Get dynamic region list with active maintainer counts
+ * @access  Public
+ */
+router.get('/regions',
+  LeaderboardController.getRegions
+);
+
+/**
+ * @route   GET /api/leaderboard/snapshots
+ * @desc    Get regional ranking snapshots history
+ * @access  Public
+ */
+router.get('/snapshots',
+  LeaderboardController.getRankingSnapshots
+);
+
+/**
+ * @route   GET /api/leaderboard/contributors
+ * @desc    Get top contributors
+ * @access  Public
+ */
+router.get('/contributors',
+  validateLeaderboardQuery,
+  LeaderboardController.getTopContributors
+);
+
+/**
+ * @route   GET /api/leaderboard/repositories
+ * @desc    Get top repositories
+ * @access  Public
+ */
+router.get('/repositories',
+  validateQueryParams,
+  LeaderboardController.getTopRepositories
+);
+
+/**
+ * @route   GET /api/leaderboard/location/:location
+ * @desc    Get leaderboard filtered by location
+ * @access  Public
+ */
+router.get('/location/:location',
+  validateLeaderboardQuery,
+  LeaderboardController.getLeaderboardByLocation
+);
+

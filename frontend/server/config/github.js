@@ -83,3 +83,46 @@ const GITHUB_CONFIG = {
 // Verify GitHub token validity
 const verifyGitHubToken = async () => {
   try {
+    const octokit = createGitHubClient();
+    const { data } = await octokit.rest.users.getAuthenticated();
+    
+    logger.info(`✅ GitHub token verified for user: ${data.login}`);
+    return {
+      valid: true,
+      user: data,
+      scopes: data.scopes || [],
+    };
+  } catch (error) {
+    logger.error('❌ GitHub token verification failed:', error.message);
+    return {
+      valid: false,
+      error: error.message,
+    };
+  }
+};
+
+// Get rate limit status
+const getRateLimit = async () => {
+  try {
+    const octokit = createGitHubClient();
+    const { data } = await octokit.rest.rateLimit.get();
+    
+    return {
+      core: data.rate,
+      search: data.search,
+      graphql: data.graphql,
+      integration_manifest: data.integration_manifest,
+    };
+  } catch (error) {
+    logger.error('Error fetching rate limit:', error.message);
+    throw error;
+  }
+};
+
+module.exports = {
+  createGitHubClient,
+  createGraphQLClient,
+  GITHUB_CONFIG,
+  verifyGitHubToken,
+  getRateLimit,
+};

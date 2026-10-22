@@ -100,3 +100,55 @@ const APP_CONSTANTS = {
     OK: 200,
     CREATED: 201,
     NO_CONTENT: 204,
+    BAD_REQUEST: 400,
+    UNAUTHORIZED: 401,
+    FORBIDDEN: 403,
+    NOT_FOUND: 404,
+    CONFLICT: 409,
+    UNPROCESSABLE_ENTITY: 422,
+    TOO_MANY_REQUESTS: 429,
+    INTERNAL_SERVER_ERROR: 500,
+    BAD_GATEWAY: 502,
+    SERVICE_UNAVAILABLE: 503,
+  },
+  
+  // Error types
+  ERROR_TYPES: {
+    VALIDATION_ERROR: 'ValidationError',
+    AUTHENTICATION_ERROR: 'AuthenticationError',
+    AUTHORIZATION_ERROR: 'AuthorizationError',
+    NOT_FOUND_ERROR: 'NotFoundError',
+    RATE_LIMIT_ERROR: 'RateLimitError',
+    GITHUB_API_ERROR: 'GitHubAPIError',
+    DATABASE_ERROR: 'DatabaseError',
+    INTERNAL_ERROR: 'InternalError',
+  },
+  
+  // Regular expressions
+  REGEX: {
+    GITHUB_USERNAME: /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i,
+    GITHUB_REPO_NAME: /^[a-zA-Z0-9._-]+$/,
+    EMAIL: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+    UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  },
+  
+  // Data limits
+  LIMITS: {
+    MAX_USERNAME_LENGTH: 39,
+    MAX_REPO_NAME_LENGTH: 100,
+    MAX_DESCRIPTION_LENGTH: 500,
+    MAX_USERS_PER_REQUEST: 100,
+    MAX_REPOS_PER_USER: 1000,
+  },
+  
+  // Default values
+  DEFAULTS: {
+    AVATAR_URL: 'https://github.com/identicons/default.png',
+    BIO: 'No bio available',
+    LOCATION: 'Unknown',
+    COMPANY: 'Independent',
+  },
+};
+
+// Export constants
+module.exports = APP_CONSTANTS;

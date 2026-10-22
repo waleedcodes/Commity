@@ -146,3 +146,78 @@ const notFound = (req, res, next) => {
   const error = new Error(`Route ${req.originalUrl} not found`);
   error.statusCode = HTTP_STATUS.NOT_FOUND;
   error.type = ERROR_TYPES.NOT_FOUND_ERROR;
+  next(error);
+};
+
+/**
+ * Async error handler wrapper
+ * Wraps async route handlers to catch promises that reject
+ */
+const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};
+
+/**
+ * Create custom error
+ */
+class AppError extends Error {
+  constructor(message, statusCode, type = ERROR_TYPES.INTERNAL_ERROR, details = null) {
+    super(message);
+    this.statusCode = statusCode;
+    this.type = type;
+    this.details = details;
+    this.isOperational = true;
+
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+/**
+ * Error factory functions
+ */
+const ErrorFactory = {
+  
+  badRequest(message = 'Bad Request', details = null) {
+    return new AppError(message, HTTP_STATUS.BAD_REQUEST, ERROR_TYPES.VALIDATION_ERROR, details);
+  },
+
+  unauthorized(message = 'Unauthorized', details = null) {
+    return new AppError(message, HTTP_STATUS.UNAUTHORIZED, ERROR_TYPES.AUTHENTICATION_ERROR, details);
+  },
+
+  forbidden(message = 'Forbidden', details = null) {
+    return new AppError(message, HTTP_STATUS.FORBIDDEN, ERROR_TYPES.AUTHORIZATION_ERROR, details);
+  },
+
+  notFound(message = 'Resource not found', details = null) {
+    return new AppError(message, HTTP_STATUS.NOT_FOUND, ERROR_TYPES.NOT_FOUND_ERROR, details);
+  },
+
+  conflict(message = 'Resource conflict', details = null) {
+    return new AppError(message, HTTP_STATUS.CONFLICT, ERROR_TYPES.VALIDATION_ERROR, details);
+  },
+
+  tooManyRequests(message = 'Too many requests', details = null) {
+    return new AppError(message, HTTP_STATUS.TOO_MANY_REQUESTS, ERROR_TYPES.RATE_LIMIT_ERROR, details);
+  },
+
+  internal(message = 'Internal server error', details = null) {
+    return new AppError(message, HTTP_STATUS.INTERNAL_SERVER_ERROR, ERROR_TYPES.INTERNAL_ERROR, details);
+  },
+
+  githubAPI(message = 'GitHub API error', statusCode = HTTP_STATUS.BAD_GATEWAY, details = null) {
+    return new AppError(message, statusCode, ERROR_TYPES.GITHUB_API_ERROR, details);
+  },
+
+  database(message = 'Database error', details = null) {
+    return new AppError(message, HTTP_STATUS.INTERNAL_SERVER_ERROR, ERROR_TYPES.DATABASE_ERROR, details);
+  },
+};
+
+module.exports = {
+  errorHandler,
+  notFound,
+  asyncHandler,
+  AppError,
+  ErrorFactory,
+};

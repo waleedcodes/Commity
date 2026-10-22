@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] page.js
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';

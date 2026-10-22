@@ -122,3 +122,65 @@ class CommittersService {
     logger.info(`📥 [CommittersService] Ingesting official 3-category rankings for '${countryName}'...`);
     try {
       const official = await this.fetchOfficialRanks(key);
+      if (!official) return null;
+
+      // Extract set of all usernames in official rankings
+      const allOfficialUsernames = new Set([
+        ...(official.user_private || []).map(u => u.toLowerCase()),
+        ...(official.user_public || []).map(u => u.toLowerCase()),
+        ...(official.user || []).map(u => u.toLowerCase()),
+      ]);
+
+      // Find all users in DB matching either the country or the official usernames
+      const usersInDb = await User.find({
+        $or: [
+          { username: { $in: Array.from(allOfficialUsernames) } },
+          { location: { $regex: countryName, $options: 'i' } }
+        ]
+      }).select('username location countryRankAll countryRankPublic countryRankCommits countryRank');
+
+      const bulkOps = [];
+      for (const u of usersInDb) {
+        const uLower = u.username.toLowerCase();
+        const rankAllIdx = official.user_private ? official.user_private.findIndex(name => name.toLowerCase() === uLower) : -1;
+        const rankPubIdx = official.user_public ? official.user_public.findIndex(name => name.toLowerCase() === uLower) : -1;
+        const rankComIdx = official.user ? official.user.findIndex(name => name.toLowerCase() === uLower) : -1;
+
+        const countryRankAll = rankAllIdx !== -1 ? rankAllIdx + 1 : null;
+        const countryRankPublic = rankPubIdx !== -1 ? rankPubIdx + 1 : null;
+        const countryRankCommits = rankComIdx !== -1 ? rankComIdx + 1 : null;
+        const countryRank = countryRankAll || countryRankPublic || countryRankCommits || null;
+
+        bulkOps.push({
+          updateOne: {
+            filter: { _id: u._id },
+            update: {
+              $set: {
+                countryRankAll,
+                countryRankPublic,
+                countryRankCommits,
+                countryRank,
+              }
+            }
+          }
+        });
+      }
+
+      if (bulkOps.length > 0) {
+        await User.bulkWrite(bulkOps);
+        logger.info(`✅ [CommittersService] Synced official ranks for ${bulkOps.length} users in DB (${countryName})`);
+      }
+
+      return {
+        country: countryName,
+        usersUpdated: bulkOps.length,
+        asOf: official.data_asof || null,
+      };
+    } catch (error) {
+      logger.error(`[CommittersService] Error syncing region '${countryName}':`, error.message);
+      throw error;
+    }
+  }
+}
+
+module.exports = CommittersService;

@@ -1,3 +1,4 @@
+// [Commity Phase 1 Scaffolding] committersService.js
 const https = require('https');
 const User = require('../models/User');
 const GitHubRankingService = require('./githubRankingService');

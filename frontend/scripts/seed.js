@@ -146,3 +146,152 @@ const SEED_USERS = [
       { name: 'vueuse', description: 'Collection of essential Vue Composition Utilities', htmlUrl: 'https://github.com/vueuse/vueuse', stars: 21000, forks: 2900, language: 'TypeScript', updatedAt: new Date() }
     ]
   },
+  {
+    githubId: 170270,
+    username: 'sindresorhus',
+    name: 'Sindre Sorhus',
+    bio: 'Full-time open-sourcerer & maker of apps and CLI tools',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/170270?v=4',
+    htmlUrl: 'https://github.com/sindresorhus',
+    company: null,
+    location: 'Paris, France',
+    blog: 'https://sindresorhus.com',
+    twitterUsername: 'sindresorhus',
+    publicRepos: 1120,
+    publicGists: 95,
+    followers: 61500,
+    following: 34,
+    githubCreatedAt: new Date('2009-12-20T20:47:08Z'),
+    githubUpdatedAt: new Date(),
+    totalCommits: 14500,
+    totalPullRequests: 3200,
+    totalIssues: 1800,
+    totalReviews: 2900,
+    totalContributions: 22400,
+    contributionStreak: 120,
+    longestStreak: 580,
+    topLanguages: [
+      { name: 'JavaScript', percentage: 61.0, bytes: 24000000, color: '#f1e05a' },
+      { name: 'TypeScript', percentage: 29.0, bytes: 11400000, color: '#3178c6' },
+      { name: 'Swift', percentage: 10.0, bytes: 3900000, color: '#F05138' }
+    ],
+    repositories: [
+      { name: 'awesome', description: 'Awesome lists about all kinds of interesting topics', htmlUrl: 'https://github.com/sindresorhus/awesome', stars: 330000, forks: 29000, language: 'Markdown', updatedAt: new Date() },
+      { name: 'got', description: 'Human-friendly and powerful HTTP request library for Node.js', htmlUrl: 'https://github.com/sindresorhus/got', stars: 13500, forks: 850, language: 'TypeScript', updatedAt: new Date() }
+    ]
+  },
+  {
+    githubId: 25254,
+    username: 'tj',
+    name: 'TJ Holowaychuk',
+    bio: 'Apex Software. Building software and designing products.',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/25254?v=4',
+    htmlUrl: 'https://github.com/tj',
+    company: 'Apex Software',
+    location: 'Victoria, BC, Canada',
+    blog: 'https://apex.sh',
+    twitterUsername: 'tjholowaychuk',
+    publicRepos: 590,
+    publicGists: 380,
+    followers: 52000,
+    following: 0,
+    githubCreatedAt: new Date('2008-09-18T18:04:12Z'),
+    githubUpdatedAt: new Date(),
+    totalCommits: 11200,
+    totalPullRequests: 1600,
+    totalIssues: 920,
+    totalReviews: 1400,
+    totalContributions: 15120,
+    contributionStreak: 35,
+    longestStreak: 290,
+    topLanguages: [
+      { name: 'Go', percentage: 55.4, bytes: 18000000, color: '#00ADD8' },
+      { name: 'JavaScript', percentage: 38.2, bytes: 12400000, color: '#f1e05a' },
+      { name: 'C', percentage: 6.4, bytes: 2100000, color: '#555555' }
+    ],
+    repositories: [
+      { name: 'commander.js', description: 'Node.js command-line interfaces made easy', htmlUrl: 'https://github.com/tj/commander.js', stars: 26500, forks: 1700, language: 'JavaScript', updatedAt: new Date() },
+      { name: 'git-extras', description: 'GIT utilities -- repo summary, repl, changelog population, etc.', htmlUrl: 'https://github.com/tj/git-extras', stars: 17400, forks: 1300, language: 'Shell', updatedAt: new Date() }
+    ]
+  },
+  {
+    githubId: 13041,
+    username: 'rauchg',
+    name: 'Guillermo Rauch',
+    bio: 'CEO @vercel. Making the Web faster.',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/13041?v=4',
+    htmlUrl: 'https://github.com/rauchg',
+    company: 'Vercel',
+    location: 'San Francisco, CA',
+    blog: 'https://rauchg.com',
+    twitterUsername: 'rauchg',
+    publicRepos: 240,
+    publicGists: 140,
+    followers: 68500,
+    following: 88,
+    githubCreatedAt: new Date('2008-06-08T19:54:19Z'),
+    githubUpdatedAt: new Date(),
+    totalCommits: 4300,
+    totalPullRequests: 780,
+    totalIssues: 410,
+    totalReviews: 950,
+    totalContributions: 6440,
+    contributionStreak: 21,
+    longestStreak: 195,
+    topLanguages: [
+      { name: 'TypeScript', percentage: 58.0, bytes: 11000000, color: '#3178c6' },
+      { name: 'JavaScript', percentage: 36.0, bytes: 6800000, color: '#f1e05a' },
+      { name: 'CSS', percentage: 6.0, bytes: 1140000, color: '#1572B6' }
+    ],
+    repositories: [
+      { name: 'next.js', description: 'The React Framework', htmlUrl: 'https://github.com/vercel/next.js', stars: 128000, forks: 27000, language: 'JavaScript', updatedAt: new Date() },
+      { name: 'slackin', description: 'Public Slack organization invite page', htmlUrl: 'https://github.com/rauchg/slackin', stars: 5900, forks: 650, language: 'JavaScript', updatedAt: new Date() }
+    ]
+  },
+  {
+    githubId: 124599,
+    username: 'shadcn',
+    name: 'shadcn',
+    bio: 'Designing and building open source tools for developers.',
+    avatarUrl: 'https://avatars.githubusercontent.com/u/124599?v=4',
+    htmlUrl: 'https://github.com/shadcn',
+    company: null,
+    location: 'San Francisco, CA',
+    blog: 'https://ui.shadcn.com',
+    twitterUsername: 'shadcn',
+    publicRepos: 65,
+    publicGists: 30,
+    followers: 78000,
+    following: 40,
+    githubCreatedAt: new Date('2009-09-08T09:20:10Z'),
+    githubUpdatedAt: new Date(),
+    totalCommits: 3890,
+    totalPullRequests: 1150,
+    totalIssues: 540,
+    totalReviews: 820,
+    totalContributions: 6400,
+    contributionStreak: 41,
+    longestStreak: 160,
+    topLanguages: [
+      { name: 'TypeScript', percentage: 84.5, bytes: 15200000, color: '#3178c6' },
+      { name: 'CSS', percentage: 11.0, bytes: 1980000, color: '#1572B6' },
+      { name: 'JavaScript', percentage: 4.5, bytes: 810000, color: '#f1e05a' }
+    ],
+    repositories: [
+      { name: 'ui', description: 'Beautifully designed components that you can copy and paste into your apps.', htmlUrl: 'https://github.com/shadcn-ui/ui', stars: 76000, forks: 6200, language: 'TypeScript', updatedAt: new Date() },
+      { name: 'taxonomy', description: 'An open source application built using the new router, server components and everything new in Next.js 13.', htmlUrl: 'https://github.com/shadcn-ui/taxonomy', stars: 18000, forks: 2100, language: 'TypeScript', updatedAt: new Date() }
+    ]
+  }
+];
+
+// Helper to generate simulated 30-day contribution timeline
+function generateContributionCalendar(totalContributions) {
+  const calendar = [];
+  const today = new Date();
+  const dailyAverage = Math.max(1, Math.floor(totalContributions / 365));
+
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(today.getDate() - i);
+    d.setHours(0, 0, 0, 0);
+

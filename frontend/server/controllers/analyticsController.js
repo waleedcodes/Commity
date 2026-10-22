@@ -408,3 +408,413 @@ class AnalyticsController {
 
             if (repositories && repositories.length > 0) {
               const totalStars = repositories.reduce((sum, repo) => sum + (repo.stargazersCount || 0), 0);
+              const totalForks = repositories.reduce((sum, repo) => sum + (repo.forksCount || 0), 0);
+              
+              repositoryAnalysis = {
+                totalPublic: user.publicRepos || 0,
+                totalStars,
+                totalForks,
+                averageStars: repositories.length > 0 ? Math.round(totalStars / repositories.length) : 0,
+                averageForks: repositories.length > 0 ? Math.round(totalForks / repositories.length) : 0,
+                topRepositories: repositories
+                  .sort((a, b) => (b.stargazersCount || 0) - (a.stargazersCount || 0))
+                  .slice(0, 5)
+                  .map(repo => ({
+                    name: repo.name,
+                    description: repo.description,
+                    language: repo.language,
+                    stars: repo.stargazersCount || 0,
+                    forks: repo.forksCount || 0,
+                    updatedAt: repo.updatedAt,
+                    htmlUrl: repo.htmlUrl,
+                  })),
+                languageDistribution: this._calculateRepoLanguageDistribution(repositories),
+              };
+            }
+          } catch (error) {
+            logger.warn(`Failed to fetch repository data for analytics: ${error.message}`);
+            repositoryAnalysis = {
+              totalPublic: user.publicRepos || 0,
+              totalStars: 0,
+              totalForks: 0,
+              averageStars: 0,
+              averageForks: 0,
+              topRepositories: [],
+              languageDistribution: [],
+            };
+          }
+        }
+
+        // Performance metrics
+        const performanceMetrics = {
+          consistencyScore: this._calculateConsistencyScore(userAnalytics),
+          productivityScore: this._calculateProductivityScore(totalStats, userAnalytics.length),
+          engagementScore: this._calculateEngagementScore(user),
+          overallScore: this._calculateOverallScore(totalStats, user),
+        };
+
+        // Comparison with similar users
+        const comparison = await this._getUserComparison(user, totalStats);
+
+        return {
+          user: {
+            username: user.username,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+            location: user.location,
+            bio: user.bio,
+            company: user.company,
+            blog: user.blog,
+            followers: user.followers,
+            following: user.following,
+            publicRepos: user.publicRepos,
+            totalRepos: user.totalRepos,
+            createdAt: user.createdAt,
+            lastUpdate: user.lastAnalyticsUpdate,
+          },
+          period: {
+            start: dateRange.start.toISOString(),
+            end: dateRange.end.toISOString(),
+            duration: period,
+            recordsFound: userAnalytics.length,
+          },
+          statistics: {
+            period: totalStats,
+            lifetime: {
+              commits: user.totalCommits || 0,
+              pullRequests: user.totalPullRequests || 0,
+              issues: user.totalIssues || 0,
+              reviews: user.totalReviews || 0,
+              contributions: user.totalContributions || 0,
+              streak: {
+                current: user.contributionStreak || user.currentStreak || 0,
+                longest: user.longestStreak || 0,
+              },
+            },
+          },
+          rankings,
+          activityTimeline,
+          languageAnalysis,
+          repositoryAnalysis,
+          performanceMetrics,
+          comparison,
+          generatedAt: new Date().toISOString(),
+        };
+      },
+      15 * 60 // 15 minutes cache
+    );
+
+    res.json({
+      success: true,
+      data: analytics,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Get analytics trends and patterns
+   * @route   GET /api/analytics/trends
+   * @access  Public
+   */
+  static getAnalyticsTrends = asyncHandler(async (req, res) => {
+    const { 
+      period = '90d',
+      metric = 'commits',
+      groupBy = 'daily',
+      location,
+      language 
+    } = req.query;
+
+    const cacheKey = CacheManager.generateKey(
+      'analytics_trends',
+      period,
+      metric,
+      groupBy,
+      location || 'global',
+      language || 'all'
+    );
+
+    const trends = await CacheManager.getOrSet(
+      CACHE_KEYS.ANALYTICS,
+      cacheKey,
+      async () => {
+        const dateRange = Helpers.getDateRange(period);
+        
+        // Build aggregation pipeline
+        const pipeline = [
+          {
+            $match: {
+              date: { $gte: dateRange.start, $lte: dateRange.end }
+            }
+          }
+        ];
+
+        // Add location filter if specified
+        if (location) {
+          // First get users from that location
+          const usersInLocation = await User.find({
+            location: { $regex: location, $options: 'i' },
+            isActive: true
+          }).select('username');
+          
+          const usernames = usersInLocation.map(u => u.username);
+          pipeline.push({
+            $match: { username: { $in: usernames } }
+          });
+        }
+
+        // Add language filter if specified
+        if (language) {
+          const usersWithLanguage = await User.find({
+            'topLanguages.name': { $regex: language, $options: 'i' },
+            isActive: true
+          }).select('username');
+          
+          const usernames = usersWithLanguage.map(u => u.username);
+          pipeline.push({
+            $match: { username: { $in: usernames } }
+          });
+        }
+
+        // Group by time period
+        let groupBy_id;
+        switch (groupBy) {
+          case 'weekly':
+            groupBy_id = {
+              year: { $year: '$date' },
+              week: { $week: '$date' }
+            };
+            break;
+          case 'monthly':
+          case '30d':
+            groupBy_id = {
+              year: { $year: '$date' },
+              month: { $month: '$date' }
+            };
+            break;
+          default: // daily
+            groupBy_id = {
+              year: { $year: '$date' },
+              month: { $month: '$date' },
+              day: { $dayOfMonth: '$date' }
+            };
+        }
+
+        pipeline.push(
+          {
+            $group: {
+              _id: groupBy_id,
+              totalCommits: { $sum: '$commits' },
+              totalPullRequests: { $sum: '$pullRequests' },
+              totalIssues: { $sum: '$issues' },
+              totalReviews: { $sum: '$reviews' },
+              activeUsers: { $addToSet: '$username' },
+              averageCommits: { $avg: '$commits' },
+              maxCommits: { $max: '$commits' },
+              minCommits: { $min: '$commits' },
+            }
+          },
+          {
+            $addFields: {
+              activeUserCount: { $size: '$activeUsers' },
+              totalContributions: {
+                $add: ['$totalCommits', '$totalPullRequests', '$totalIssues', '$totalReviews']
+              }
+            }
+          },
+          {
+            $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+          }
+        );
+
+        const results = await Analytics.aggregate(pipeline);
+
+        // Format results with date strings
+        const formattedResults = results.map(item => {
+          let dateStr;
+          if (groupBy === 'monthly' || groupBy === '30d') {
+            dateStr = `${item._id.year}-${String(item._id.month).padStart(2, '0')}`;
+          } else if (groupBy === 'weekly') {
+            const date = new Date(item._id.year, 0, 1 + (item._id.week - 1) * 7);
+            dateStr = date.toISOString().split('T')[0];
+          } else {
+            dateStr = `${item._id.year}-${String(item._id.month).padStart(2, '0')}-${String(item._id.day).padStart(2, '0')}`;
+          }
+
+          return {
+            date: dateStr,
+            period: item._id,
+            commits: item.totalCommits,
+            pullRequests: item.totalPullRequests,
+            issues: item.totalIssues,
+            reviews: item.totalReviews,
+            totalContributions: item.totalContributions,
+            activeUsers: item.activeUserCount,
+            averageCommitsPerUser: Math.round(item.averageCommits * 100) / 100,
+            maxCommitsPerUser: item.maxCommits,
+            minCommitsPerUser: item.minCommits,
+            primaryMetricValue: item[`total${metric.charAt(0).toUpperCase() + metric.slice(1)}`] || 0,
+          };
+        });
+
+        // Calculate trend statistics
+        const trendStats = this._calculateTrendStatistics(formattedResults, metric);
+
+        return {
+          trends: formattedResults,
+          statistics: trendStats,
+          period: {
+            start: dateRange.start.toISOString(),
+            end: dateRange.end.toISOString(),
+            duration: period,
+            groupBy,
+            dataPoints: formattedResults.length,
+          },
+          filters: {
+            metric,
+            location: location || null,
+            language: language || null,
+          },
+        };
+      },
+      25 * 60 // 25 minutes cache
+    );
+
+    res.json({
+      success: true,
+      data: trends,
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  /**
+   * @desc    Compare multiple users' analytics
+   * @route   POST /api/analytics/compare
+   * @access  Public
+   */
+  static compareUsers = asyncHandler(async (req, res) => {
+    let rawUsernames = req.body?.usernames || req.query?.users || req.query?.usernames;
+    if (typeof rawUsernames === 'string') {
+      rawUsernames = rawUsernames.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    const usernames = rawUsernames;
+    const period = req.body?.period || req.query?.period || '30d';
+    const metrics = req.body?.metrics || ['commits', 'pullRequests', 'issues'];
+
+    if (!usernames || !Array.isArray(usernames) || usernames.length < 2 || usernames.length > 10) {
+      throw ErrorFactory.badRequest('Please provide 2-10 usernames to compare');
+    }
+
+    const cacheKey = CacheManager.generateKey(
+      'user_comparison',
+      usernames.sort().join(','),
+      period,
+      metrics.join(',')
+    );
+
+    const comparison = await CacheManager.getOrSet(
+      CACHE_KEYS.USER_ANALYTICS,
+      cacheKey,
+      async () => {
+        const dateRange = Helpers.getDateRange(period);
+        
+        // Get all users (case-insensitive)
+        let users = await User.find({
+          username: { $in: usernames.map(u => new RegExp(`^${u}$`, 'i')) },
+          isActive: true
+        });
+
+        if (users.length !== usernames.length) {
+          const foundLower = users.map(u => u.username.toLowerCase());
+          const missingUsernames = usernames.filter(u => !foundLower.includes(u.toLowerCase()));
+          
+          const UserService = require('../services/userService');
+          const userService = new UserService();
+          
+          for (const missingUser of missingUsernames) {
+            try {
+              logger.info(`🔍 Live syncing missing user for comparison: ${missingUser}`);
+              const synced = await userService.syncUserProfile(missingUser, false);
+              if (synced) {
+                users.push(synced);
+              }
+            } catch (err) {
+              logger.warn(`Could not live sync missing user ${missingUser}: ${err.message}`);
+            }
+          }
+
+          if (users.length < 2) {
+            const stillFound = users.map(u => u.username.toLowerCase());
+            const stillMissing = usernames.filter(u => !stillFound.includes(u.toLowerCase()));
+            throw ErrorFactory.notFound(`Users not found on GitHub: ${stillMissing.join(', ')}`);
+          }
+        }
+
+        // Get analytics for all users in the period
+        const userAnalytics = {};
+        for (const user of users) {
+          let analytics = await Analytics.find({
+            $and: [
+              { $or: [{ username: user.username }, { githubUsername: user.username }] },
+              { $or: [
+                  { date: { $gte: dateRange.start, $lte: dateRange.end } },
+                  { startDate: { $gte: dateRange.start, $lte: dateRange.end } }
+                ]
+              }
+            ]
+          }).sort({ date: 1, startDate: 1 });
+
+          if ((!analytics || analytics.length === 0) && user.contributionCalendar) {
+            analytics = user.contributionCalendar
+              .filter(item => {
+                const d = new Date(item.date);
+                return d >= dateRange.start && d <= dateRange.end;
+              })
+              .map(item => ({
+                date: new Date(item.date),
+                commits: item.contributionCount || 0,
+                pullRequests: 0,
+                issues: 0,
+                reviews: 0,
+              }));
+          }
+
+          userAnalytics[user.username] = analytics;
+        }
+
+        // Prepare comparison data
+        const comparisonData = users.map(user => {
+          const analytics = userAnalytics[user.username];
+          const periodStats = analytics.reduce((acc, record) => ({
+            commits: acc.commits + (record.commits || 0),
+            pullRequests: acc.pullRequests + (record.pullRequests || 0),
+            issues: acc.issues + (record.issues || 0),
+            reviews: acc.reviews + (record.reviews || 0),
+            activeDays: acc.activeDays + (record.commits > 0 ? 1 : 0),
+          }), { commits: 0, pullRequests: 0, issues: 0, reviews: 0, activeDays: 0 });
+
+          return {
+            username: user.username,
+            name: user.name,
+            avatarUrl: user.avatarUrl,
+            location: user.location,
+            followers: user.followers,
+            period: periodStats,
+            lifetime: {
+              commits: user.totalCommits || 0,
+              pullRequests: user.totalPullRequests || 0,
+              issues: user.totalIssues || 0,
+              reviews: user.totalReviews || 0,
+              contributions: user.totalContributions || 0,
+              publicRepos: user.publicRepos || 0,
+              streak: user.longestStreak || 0,
+            },
+            activity: analytics.map(record => {
+              const recDate = record.date ? new Date(record.date) : (record.startDate ? new Date(record.startDate) : new Date());
+              return {
+                date: isNaN(recDate.getTime()) ? new Date().toISOString().split('T')[0] : recDate.toISOString().split('T')[0],
+                commits: record.commits || 0,
+                pullRequests: record.pullRequests || 0,
+                issues: record.issues || 0,
+                reviews: record.reviews || 0,
+              };

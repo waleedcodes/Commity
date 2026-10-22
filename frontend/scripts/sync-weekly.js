@@ -7,3 +7,12 @@ const connectDB = require('../server/config/database');
 const syncWorker = require('../server/services/syncWorker');
 const logger = require('../server/utils/logger');
 
+async function run() {
+  try {
+    logger.info('🚀 Starting Commity Weekly Snapshot Synchronization...');
+    await connectDB();
+
+    logger.info('Running weekly ranking and profile sync...');
+    await syncWorker.runWeeklySync();
+
+    logger.info('🎉 Weekly synchronization finished successfully!');

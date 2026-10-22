@@ -24,3 +24,16 @@ backend/logs/
 .env.local
 .env.development.local
 .env.test.local
+.env.production.local
+frontend/.env.local
+backend/.env
+
+# Do not ignore example env files
+!.env.example
+!frontend/.env.example
+!backend/.env.example
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/

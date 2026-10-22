@@ -47,3 +47,52 @@ class SyncWorker {
   async runWeeklySync() {
     if (this.isRunning) {
       logger.warn('SyncWorker is already executing a synchronization cycle, skipping');
+      return;
+    }
+
+    this.isRunning = true;
+    const startTime = Date.now();
+
+    try {
+      const staleThreshold = new Date(Date.now() - (this.syncIntervalDays * 24 * 60 * 60 * 1000));
+
+      // Find all users who haven't been synchronized within the last 7 days (excluding Organizations)
+      const staleUsers = await User.find({
+        isActive: true,
+        accountType: { $ne: 'Organization' },
+        $or: [
+          { lastFetchedAt: { $lt: staleThreshold } },
+          { lastFetchedAt: null },
+          { totalContributions: 0 }
+        ]
+      }).select('username lastFetchedAt').limit(50);
+
+      logger.info(`🔍 SyncWorker found ${staleUsers.length} profiles eligible for weekly snapshot sync`);
+
+      let updatedCount = 0;
+      let errorCount = 0;
+
+      for (const user of staleUsers) {
+        try {
+          logger.info(`Refreshing weekly snapshot for @${user.username}...`);
+          await this.userService.syncUserProfile(user.username, true);
+          updatedCount++;
+          // Rate-limit pause to ensure GitHub API limits (5,000/hr) are never exceeded
+          await Helpers.sleep(300);
+        } catch (err) {
+          errorCount++;
+          logger.warn(`Failed to sync @${user.username}: ${err.message}`);
+        }
+      }
+
+      const durationSec = Math.round((Date.now() - startTime) / 1000);
+      logger.info(`✅ SyncWorker cycle finished in ${durationSec}s: ${updatedCount} updated, ${errorCount} errors`);
+
+      // Synchronize authoritative committers.top rankings for Pakistan
+      try {
+        const CommittersService = require('./committersService');
+        await CommittersService.syncRegion('Pakistan');
+      } catch (rankingErr) {
+        logger.warn(`Committers.top sync warning: ${rankingErr.message}`);
+      }
+

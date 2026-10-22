@@ -49,3 +49,54 @@ const APP_CONSTANTS = {
   // Contribution types
   CONTRIBUTION_TYPES: {
     COMMITS: 'commits',
+    PULL_REQUESTS: 'pull_requests',
+    ISSUES: 'issues',
+    REVIEWS: 'reviews',
+    RELEASES: 'releases',
+  },
+  
+  // Leaderboard categories
+  LEADERBOARD_CATEGORIES: {
+    COMMITS: 'commits',
+    REPOSITORIES: 'repositories',
+    FOLLOWERS: 'followers',
+    CONTRIBUTIONS: 'contributions',
+    PUBLIC_CONTRIBUTIONS: 'public_contributions',
+    PRIVATE_CONTRIBUTIONS: 'private_contributions',
+    STREAK: 'streak',
+  },
+  
+  // Cache keys
+  CACHE_KEYS: {
+    USER_PROFILE: 'user_profile',
+    USER_REPOS: 'user_repos',
+    USER_EVENTS: 'user_events',
+    USER_ANALYTICS: 'user_analytics',
+    LEADERBOARD: 'leaderboard',
+    ANALYTICS: 'analytics',
+    RATE_LIMIT: 'rate_limit',
+  },
+  
+  // Time constants (in milliseconds)
+  TIME: {
+    SECOND: 1000,
+    MINUTE: 60 * 1000,
+    HOUR: 60 * 60 * 1000,
+    DAY: 24 * 60 * 60 * 1000,
+    WEEK: 7 * 24 * 60 * 60 * 1000,
+    MONTH: 30 * 24 * 60 * 60 * 1000,
+    YEAR: 365 * 24 * 60 * 60 * 1000,
+  },
+  
+  // Pagination defaults
+  PAGINATION: {
+    DEFAULT_PAGE: 1,
+    DEFAULT_LIMIT: 20,
+    MAX_LIMIT: 1000,
+  },
+  
+  // Status codes
+  HTTP_STATUS: {
+    OK: 200,
+    CREATED: 201,
+    NO_CONTENT: 204,

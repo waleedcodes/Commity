@@ -13,3 +13,18 @@ export async function POST(request) {
   return handleSync(request);
 }
 
+async function handleSync(request) {
+  // Validate authorization if CRON_SECRET is configured
+  const authHeader = request.headers.get('authorization');
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    await connectDB();
+    logger.info('🚀 Triggering on-demand weekly sync via API...');
+    
+    // Run weekly sync cycle
+    const result = await syncWorker.runWeeklySync();

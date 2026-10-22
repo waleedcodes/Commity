@@ -81,3 +81,45 @@ async function populateDevelopers() {
       const user = await userService.syncUserProfile(username, true);
       // Ensure location contains Pakistan if empty or missing
       if (!user.location || !user.location.toLowerCase().includes('pakistan')) {
+        user.location = user.location ? `${user.location}, Pakistan` : 'Pakistan';
+        await user.save();
+      }
+      console.log(`    ✓ Saved @${username}: ${user.name || username} (${user.totalContributions || 0} contribs, ${user.followers || 0} followers, ${user.location})`);
+      pkSuccess++;
+      await sleep(300); // Throttling
+    } catch (err) {
+      console.warn(`    ✗ Failed @${username}: ${err.message}`);
+    }
+  }
+
+  // 3. Sync Global developers
+  console.log('\n🌍 Syncing Global champions into MongoDB...');
+  let globalSuccess = 0;
+  for (const username of GLOBAL_HANDLES) {
+    try {
+      console.log(` -> Fetching @${username}...`);
+      const user = await userService.syncUserProfile(username, false);
+      console.log(`    ✓ Saved @${username}: ${user.name || username} (${user.totalContributions || 0} contribs, ${user.followers || 0} followers, ${user.location})`);
+      globalSuccess++;
+      await sleep(300);
+    } catch (err) {
+      console.warn(`    ✗ Failed @${username}: ${err.message}`);
+    }
+  }
+
+  // 4. Update rankings
+  console.log('\n📊 Recalculating global and regional ranks...');
+  const totalInDb = await User.countDocuments({ isActive: true });
+  const pkInDb = await User.countDocuments({ isActive: true, location: { $regex: 'Pakistan', $options: 'i' } });
+
+  console.log(`\n🎉 Indexing Complete!`);
+  console.log(`📈 Total Tracked Active Developers: ${totalInDb}`);
+  console.log(`🇵🇰 Total Pakistan Developers Tracked: ${pkInDb}`);
+  
+  process.exit(0);
+}
+
+populateDevelopers().catch(err => {
+  console.error('Fatal error in populateDevelopers:', err);
+  process.exit(1);
+});

@@ -40,3 +40,46 @@ const createGitHubClient = () => {
   return new Octokit(clientOptions);
 };
 
+// GraphQL client for complex queries
+const createGraphQLClient = () => {
+  const auth = process.env.GITHUB_TOKEN;
+  const isPlaceholder = isTokenPlaceholder(auth);
+  
+  if (isPlaceholder) {
+    return async () => {
+      throw new Error('GraphQL requires a valid GITHUB_TOKEN');
+    };
+  }
+
+  return graphql.defaults({
+    headers: {
+      authorization: `token ${auth}`,
+    },
+  });
+};
+
+// GitHub API endpoints and configurations
+const GITHUB_CONFIG = {
+  // API endpoints
+  BASE_URL: 'https://api.github.com',
+  GRAPHQL_URL: 'https://api.github.com/graphql',
+  
+  // Rate limits
+  REST_RATE_LIMIT: 5000, // requests per hour
+  GRAPHQL_RATE_LIMIT: 5000, // points per hour
+  
+  // Pagination
+  DEFAULT_PER_PAGE: 30,
+  MAX_PER_PAGE: 100,
+  
+  // Cache settings
+  CACHE_TTL: 300, // 5 minutes in seconds
+  
+  // Retry settings
+  MAX_RETRIES: 3,
+  RETRY_DELAY: 1000, // 1 second
+};
+
+// Verify GitHub token validity
+const verifyGitHubToken = async () => {
+  try {

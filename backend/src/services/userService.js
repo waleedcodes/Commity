@@ -1,4 +1,3 @@
-// [Commity Phase 2 Logic] userService.js
 const User = require('../models/User');
 const Analytics = require('../models/Analytics');
 const logger = require('../utils/logger');

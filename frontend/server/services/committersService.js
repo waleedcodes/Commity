@@ -60,3 +60,65 @@ class CommittersService {
           return resolve(null);
         }
         let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            ranksCache.set(key, { data: parsed, timestamp: Date.now() });
+            resolve(parsed);
+          } catch {
+            resolve(null);
+          }
+        });
+      }).on('error', (err) => {
+        logger.warn(`[CommittersService] Error fetching committers.top for ${key}: ${err.message}`);
+        resolve(null);
+      });
+    });
+  }
+
+  /**
+   * Get verified committers.top ranks for a specific user
+   * @param {string} username
+   * @param {string} countryName
+   * @returns {Promise<object|null>}
+   */
+  static async getUserRanks(username, countryName = 'pakistan') {
+    if (!username) return null;
+    const countryKey = this.normalizeCountryKey(countryName);
+    if (!countryKey) return null;
+
+    const official = await this.fetchOfficialRanks(countryKey);
+    if (!official) return null;
+
+    const lower = username.toLowerCase();
+    const findIndex = (arr) => {
+      if (!Array.isArray(arr)) return null;
+      const idx = arr.findIndex(u => typeof u === 'string' && u.toLowerCase() === lower);
+      return idx !== -1 ? idx + 1 : null;
+    };
+
+    const countryRankAll = findIndex(official.user_private);
+    const countryRankPublic = findIndex(official.user_public);
+    const countryRankCommits = findIndex(official.user);
+
+    return {
+      country: countryName,
+      countryKey,
+      countryRankAll,
+      countryRankPublic,
+      countryRankCommits,
+      countryRank: countryRankAll || countryRankPublic || countryRankCommits || null,
+      isRanked: Boolean(countryRankAll || countryRankPublic || countryRankCommits),
+      asOf: official.data_asof || null,
+    };
+  }
+
+  /**
+   * Ingest and synchronize a region's rankings in bulk
+   */
+  static async syncRegion(countryKey = 'pakistan', countryName = 'Pakistan') {
+    const key = this.normalizeCountryKey(countryKey) || 'pakistan';
+    logger.info(`📥 [CommittersService] Ingesting official 3-category rankings for '${countryName}'...`);
+    try {
+      const official = await this.fetchOfficialRanks(key);

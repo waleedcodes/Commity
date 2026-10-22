@@ -1,4 +1,4 @@
-// [Commity Phase 1 Scaffolding] page.js
+// [Commity Phase 2 Logic] page.js
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
@@ -546,7 +546,7 @@ export default function Leaderboard() {
               {top2 && (
                 <div className="order-2 md:order-1 bg-slate-800/60 border border-slate-700/70 rounded-2xl p-6 backdrop-blur-md relative hover:border-slate-600 transition group">
                   <div className="absolute -top-3 left-6 px-3 py-0.5 rounded-full bg-slate-700 text-slate-300 text-xs font-bold border border-slate-600 flex items-center gap-1 shadow">
-                    <span>🥈</span> Rank #2
+                    <span>🥈</span> {top2.rank ? `Rank #${top2.rank}` : 'Rank #2'}
                   </div>
                   <div className="flex flex-col items-center text-center mt-2">
                     <div className="relative mb-3">
@@ -590,7 +590,7 @@ export default function Leaderboard() {
                         className="w-full border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center justify-center gap-1.5"
                       >
                         <Swords className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>⚔️ Challenge #2</span>
+                        <span>⚔️ Challenge #{top2.rank || 2}</span>
                       </Button>
                     </div>
                   </div>
@@ -601,7 +601,7 @@ export default function Leaderboard() {
               {top1 && (
                 <div className="order-1 md:order-2 bg-gradient-to-b from-amber-500/10 to-slate-800/80 border-2 border-amber-500/40 rounded-2xl p-7 backdrop-blur-md relative hover:border-amber-400 transition group shadow-2xl shadow-amber-500/10 md:-translate-y-3">
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 text-slate-950 text-xs font-black flex items-center gap-1 shadow-lg shadow-amber-500/30 uppercase tracking-wide">
-                    <span>👑</span> Champion #1
+                    <span>👑</span> {top1.rank === 1 ? 'Champion #1' : `Rank #${top1.rank || 1}`}
                   </div>
                   <div className="flex flex-col items-center text-center mt-3">
                     <div className="relative mb-3">
@@ -610,7 +610,7 @@ export default function Leaderboard() {
                         <AvatarFallback>{(top1.username || top1.login || '1').slice(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
                       <div className="absolute -bottom-2 -right-1 bg-amber-400 text-slate-950 text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                        #1
+                        #{top1.rank || 1}
                       </div>
                     </div>
                     <Link href={`/profile/${top1.username || top1.login}`} className="group-hover:text-amber-400 transition">
@@ -648,7 +648,7 @@ export default function Leaderboard() {
                         className="w-full border-amber-500/50 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10"
                       >
                         <Swords className="w-3.5 h-3.5 text-amber-400" />
-                        <span>⚔️ Challenge Champion in Duel</span>
+                        <span>⚔️ Challenge #{top1.rank || 1} in Duel</span>
                       </Button>
                     </div>
                   </div>
@@ -659,7 +659,7 @@ export default function Leaderboard() {
               {top3 && (
                 <div className="order-3 bg-slate-800/60 border border-slate-700/70 rounded-2xl p-6 backdrop-blur-md relative hover:border-slate-600 transition group">
                   <div className="absolute -top-3 left-6 px-3 py-0.5 rounded-full bg-amber-900/60 text-amber-300 text-xs font-bold border border-amber-700/60 flex items-center gap-1 shadow">
-                    <span>🥉</span> Rank #3
+                    <span>🥉</span> {top3.rank ? `Rank #${top3.rank}` : 'Rank #3'}
                   </div>
                   <div className="flex flex-col items-center text-center mt-2">
                     <div className="relative mb-3">
